@@ -1,0 +1,77 @@
+---
+title: "rhizobia.plant.individual_sd_03022023"
+author: "Caleb Hill, John McMullen, Jay Lennon"
+date: "2023-02-03"
+output: html_document
+---
+
+## Clear workspace and set directory
+```{r setup}
+rm(list=ls())
+getwd()
+# will need to update following line to map to your files
+setwd("/Users/User/Desktop/thesis_stuff/R_working")
+```
+
+## Load packages and functions
+```{r}
+# these are packages that you might need for data wrangling, etc.
+require("png")
+require("dplyr")
+require("grid")
+require("ggplot2")
+require("qqplotr")
+library("car")
+library("tidyverse")
+
+
+```
+
+
+# Plant data
+
+```{r}
+# load data
+
+data <- read.csv("rhizobia.plant.individual.csv")
+```
+
+
+``` {r}
+## 2 February 2023
+
+## Convert to factor/date variable
+
+
+data$ID<-as.factor(data$ID)
+data$microbe<-as.factor(data$microbe)
+data$plant<-as.factor(data$plant)
+data$nitrogen<-as.factor(data$nitrogen)
+data$date<-as.Date(data$date, format = "%m/%d/%Y")
+
+```
+
+
+```{r}
+#############################
+
+
+# Computes SD within  each pot of three plants for each relevant measure
+
+
+individual_pot_plot <- data %>%
+     group_by(ID) %>% 
+     summarise(meanheight = mean(height), SDheight=sd(height), meanchloro = mean(chlorophyll), SDchloro=sd(chlorophyll), meanleaves = mean(leaves), SDleaves=sd(leaves))
+
+```
+
+
+```{r}
+
+#creates histogram of leaf count data
+
+leafcount<-data %>% dplyr::filter(microbe != "pbs") #to exclude PBS negative controls; can be edited to filter out WT
+
+hist(leafcount$leaves, ylim=c(0,35))
+
+```
