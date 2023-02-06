@@ -1,6 +1,6 @@
 ---
 title: "rhizobia.plant.individual_sd_03022023"
-author: "Caleb Hill"
+author: "Caleb Hill, John McMullen, Jay Lennon"
 date: "2023-02-03"
 output: html_document
 ---
