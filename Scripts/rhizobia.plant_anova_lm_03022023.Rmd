@@ -6,6 +6,8 @@ header-includes:
    - \usepackage{array}
 output: pdf_document
 geometry: margin=2.54cm
+editor_options: 
+  chunk_output_type: console
 ---
 
 ## Clear workspace and set directory
@@ -13,7 +15,7 @@ geometry: margin=2.54cm
 rm(list=ls())
 getwd()
 # will need to update following line to map to your files
-setwd("/Users/User/Desktop/thesis_stuff/R_working")
+setwd("~/GitHub/rhizo.rb.tnseq/")
 
 ## Load packages and functions
 
@@ -34,7 +36,7 @@ cv <- function(x) sd(x)/sqrt(mean(x))
 
 # load data
 
-data <- read.csv("rhizobia.plant.csv")
+data <- read.csv("./Data/rhizobia.plant.csv")
 
 ## Convert to factor/date variable
 
@@ -42,6 +44,12 @@ data$microbe<-as.factor(data$microbe)
 data$plant<-as.factor(data$plant)
 data$nitrogen<-as.factor(data$nitrogen)
 data$date<-as.Date(data$date, format = "%m/%d/%Y")
+
+st.date = as.Date("7/13/2022",format="%m/%d/%Y")
+
+data$date <- data$date-st.date #convert to days post inoculation
+
+data$date <- as.numeric(as.character(gsub(" days",replacement = "",x=data$date)))
 
 ```
 
@@ -53,15 +61,15 @@ data$date<-as.Date(data$date, format = "%m/%d/%Y")
 
 library(dplyr)
 
-ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=nitrogen,y=dry.biomass)) +
+ggplot(data=data, aes(x=nitrogen,y=dry.biomass,color=microbe)) +
      geom_boxplot()
 
-ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=date,y=dry.biomass)) +
+ggplot(data=data, aes(x=date,y=dry.biomass,color=microbe,shape=nitrogen)) +
      geom_point() #if there looks to be a trend, add the time in the lm equation #filter functions remove PBs negative controls from dataset; can be further altered to look only at lib data rather than lib+WT
 
 #Assess the effect of rhizobia presence over time points. Due to variation in magnitude of plant biomass, data was log10 transformed. I'd check without log10 first and see how the residuals look.
 
-biomass = lm(dry.biomass ~ nitrogen + date,data=data)
+biomass = lm(dry.biomass ~ nitrogen,data=subset(data,microbe=="lib"))
 # biomass = lm(log10(dry.biomass) ~ nitrogen,data=data)
 
 summary(biomass)
@@ -80,7 +88,7 @@ shapiro.test(biomass_res) #not significant
 plot(fitted(biomass),biomass_res);
 abline(h=0,lty=2);
 lines(smooth.spline(fitted(biomass),biomass_res)); #fairly even spread
-leveneTest(biomass_res ~ nitrogen * date, data = data) #not significant
+leveneTest(biomass_res ~ nitrogen, data = subset(data,microbe=='lib')) #not significant
 #All looks okay
 
 #omnibus test
@@ -94,6 +102,7 @@ se <- function(x) {sd(x)/sqrt(length(x))}
 
 #setup data to plot
 biomass_plot <- data %>%
+     filter(microbe=="lib") %>%
      group_by(nitrogen) %>% 
      summarise(mean = mean(dry.biomass), SE=se(dry.biomass))
 
@@ -103,8 +112,8 @@ biomass_plot <- data %>%
 ggplot(biomass_plot, aes(x=nitrogen,y=mean)) +
   geom_point(size=5)+
   geom_errorbar(aes(ymin=mean-SE,ymax=mean+SE),width=0.3) +
-  ylab(expression(atop(~Log[10]~"(biomass [mg])",paste("(mean \U00B1 SE, n = 5)")))) +
-  scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
+  ylab(expression(atop("Biomass [g]",paste("(mean \U00B1 SE, n = 5)")))) +
+  #scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
   theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
         panel.border = element_rect(linewidth = 1, colour = "black",fill=NA),
@@ -125,15 +134,15 @@ ggplot(biomass_plot, aes(x=nitrogen,y=mean)) +
 
 library(dplyr)
 
-ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=nitrogen,y=chlorophyll)) +
+ggplot(data=data, aes(x=nitrogen,y=chlorophyll,color=microbe)) +
      geom_boxplot()
 
-ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=date,y=chlorophyll)) +
+ggplot(data=data, aes(x=date,y=chlorophyll,color=microbe,shape=nitrogen)) +
      geom_point() #if there looks to be a trend, add the time in the lm equation #filter functions remove PBs negative controls from dataset; can be further altered to look only at lib data rather than lib+WT
 
 #Assess the effect of rhizobia presence over time points. Due to variation in magnitude of plant biomass, data was log10 transformed. I'd check without log10 first and see how the residuals look.
 
-chlorophyll = lm(chlorophyll ~ nitrogen + date,data=data)
+chlorophyll = lm(chlorophyll ~ nitrogen,data=subset(data,microbe=="lib"))
 # chlorophyll = lm(log10(chlorophyll) ~ nitrogen,data=data)
 
 summary(chlorophyll)
@@ -152,7 +161,7 @@ shapiro.test(chlorophyll_res) #not significant
 plot(fitted(chlorophyll),chlorophyll_res);
 abline(h=0,lty=2);
 lines(smooth.spline(fitted(chlorophyll),chlorophyll_res)); #fairly even spread
-leveneTest(chlorophyll_res ~ nitrogen * date, data = data) #not significant
+leveneTest(chlorophyll_res ~ nitrogen , data = subset(data,microbe=="lib")) #not significant
 #All looks okay
 
 #omnibus test
@@ -166,6 +175,7 @@ se <- function(x) {sd(x)/sqrt(length(x))}
 
 #setup data to plot
 chlorophyll_plot <- data %>%
+     filter(microbe=="lib")%>%
      group_by(nitrogen) %>% 
      summarise(mean = mean(chlorophyll), SE=se(chlorophyll))
 
@@ -175,8 +185,8 @@ chlorophyll_plot <- data %>%
 ggplot(chlorophyll_plot, aes(x=nitrogen,y=mean)) +
   geom_point(size=5)+
   geom_errorbar(aes(ymin=mean-SE,ymax=mean+SE),width=0.3) +
-  ylab(expression(atop(~Log[10]~"(chlorophyll content [mg])",paste("(mean \U00B1 SE, n = 5)")))) +
-  scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
+  ylab(expression(atop("Chlorophyll content)",paste("(mean \U00B1 SE, n = 5)")))) +
+  #scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
   theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
         panel.border = element_rect(linewidth = 1, colour = "black",fill=NA),
@@ -207,7 +217,7 @@ ggplot(data=librarymass, aes(x=date,y=nodule.biomass)) +
 
 #Assess the effect of rhizobia presence over time points. Due to variation in magnitude of plant biomass, data was log10 transformed. I'd check without log10 first and see how the residuals look.
 
-nodbiomass = lm(nodule.biomass ~ nitrogen + date,data=librarymass)
+nodbiomass = lm(nodule.biomass ~ nitrogen,data=librarymass)
 # biomass = lm(log10(librarymass$nodule.biomass) ~ nitrogen,data=librarymass)
 
 summary(nodbiomass)
@@ -240,6 +250,7 @@ se <- function(x) {sd(x)/sqrt(length(x))}
 
 #setup data to plot
 nodbiomass_plot <- data %>%
+     filter(microbe=="lib") %>%
      group_by(nitrogen) %>% 
      summarise(mean = mean(nodule.biomass), SE=se(nodule.biomass))
 
@@ -250,7 +261,7 @@ ggplot(nodbiomass_plot, aes(x=nitrogen,y=mean)) +
   geom_point(size=5)+
   geom_errorbar(aes(ymin=mean-SE,ymax=mean+SE),width=0.3) +
   ylab(expression(atop(~Log[10]~"(nodule biomass [mg])",paste("(mean \U00B1 SE, n = 5)")))) +
-  scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
+  #scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
   theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
         panel.border = element_rect(linewidth = 1, colour = "black",fill=NA),
@@ -279,7 +290,7 @@ ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=date,y=height)) +
 
 #Assess the effect of rhizobia presence over time points. Due to variation in magnitude of plant biomass, data was log10 transformed. I'd check without log10 first and see how the residuals look.
 
-height = lm(height ~ nitrogen + date,data=data)
+height = lm(height ~ nitrogen ,data=subset(data,microbe=="lib"))
 # height = lm(log10(height) ~ nitrogen,data=data)
 
 summary(height)
@@ -312,6 +323,7 @@ se <- function(x) {sd(x)/sqrt(length(x))}
 
 #setup data to plot
 height_plot <- data %>%
+     filter(microbe=="lib") %>%
      group_by(nitrogen) %>% 
      summarise(mean = mean(height), SE=se(height))
 
@@ -321,8 +333,8 @@ height_plot <- data %>%
 ggplot(height_plot, aes(x=nitrogen,y=mean)) +
   geom_point(size=5)+
   geom_errorbar(aes(ymin=mean-SE,ymax=mean+SE),width=0.3) +
-  ylab(expression(atop(~Log[10]~"(height [cm])",paste("(mean \U00B1 SE, n = 5)")))) +
-  scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
+  ylab(expression(atop("Height [cm]",paste("(mean \U00B1 SE, n = 5)")))) +
+  #scale_y_continuous(limits=c(0.85,4),breaks=seq(1,4,by=1))+
   theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
         panel.border = element_rect(linewidth = 1, colour = "black",fill=NA),
