@@ -1,0 +1,102 @@
+---
+title: "rhizobia.plant.individual_sd_03022023"
+author: "Caleb Hill"
+date: "2023-02-03"
+output: html_document
+editor_options:
+  chunk_output_Type: inline
+
+---
+
+## Clear workspace and set directory
+
+```{r setup}
+
+rm(list=ls())
+getwd() #clear workspace and set directory
+
+# will need to update following line to map to your files
+setwd("/Users/User/Desktop/thesis_stuff/R_working")
+
+## Load packages and functions
+
+# these are packages that you might need for data wrangling, etc.
+require("png")
+require("dplyr")
+require("grid")
+require("ggplot2")
+require("qqplotr")
+library("car")
+library("tidyverse")
+
+# load plant data
+
+data <- read.csv("rhizobia.plant.individual.csv")
+
+## Convert to factor/date variable
+
+
+data$ID<-as.factor(data$ID)
+data$microbe<-as.factor(data$microbe)
+data$plant<-as.factor(data$plant)
+data$nitrogen<-as.factor(data$nitrogen)
+data$date<-as.Date(data$date, format = "%m/%d/%Y")
+
+st.date = as.Date("7/13/2022",format="%m/%d/%Y")
+
+data$date <- data$date-st.date #convert to days post inoculation
+
+data$date <- as.numeric(as.character(gsub(" days",replacement = "",x=data$date)))
+
+```
+
+
+```{r}
+#############################
+
+
+# Computes SD within  each pot of three plants for each relevant measure
+
+
+individual_pot_plot <- data %>%
+     group_by(ID) %>% 
+     summarise(nitrogen = nitrogen, meanheight = mean(height), SDheight=sd(height), meanchloro = mean(chlorophyll), SDchloro=sd(chlorophyll), meanleaves = mean(leaves), SDleaves=sd(leaves))  #groups data according to pot and calculates mean and SD for each stat for each pot
+
+potdata <- individual_pot_plot %>% distinct() # cleans up duplicate rows in dataframe
+
+leafcount<-data %>% dplyr::filter(microbe == "lib") #creates histogram of leaf count data, including only the library dataset
+
+hist(leafcount$leaves, ylim=c(0,20)) #histogram
+
+```
+
+``` {r}
+
+#column plots of mean height, chlorophyll content, leaf count
+
+ggplot(data=subset(potdata, as.numeric(potdata$ID) <= 10), aes(x=nitrogen, y=meanheight, color=ID, fill=ID, shape=nitrogen)) + 
+  geom_col(position = position_dodge(), width = 0.75) +
+  geom_errorbar(aes(ymin=meanheight-SDheight, ymax=meanheight+SDheight), width = 0.2, position = position_dodge(0.75))
+
+ggplot(data=subset(potdata, as.numeric(potdata$ID) <= 10), aes(x=nitrogen, y=meanchloro, color=ID, fill=ID, shape=nitrogen)) + 
+  geom_col(position = position_dodge(), width = 0.75) +
+  geom_errorbar(aes(ymin=meanchloro-SDchloro, ymax=meanchloro+SDchloro), width = 0.2, position = position_dodge(0.75))
+
+ggplot(data=subset(potdata, as.numeric(potdata$ID) <= 10), aes(x=nitrogen, y=meanleaves, color=ID, fill=ID, shape=nitrogen)) + 
+  geom_col(position = position_dodge(), width = 0.75) +
+  geom_errorbar(aes(ymin=meanleaves-SDleaves, ymax=meanleaves+SDleaves), width = 0.2, position = position_dodge(0.75))
+
+#boxplots of the per-pot data (not sure if useful at all
+
+ggplot(data=subset(data,microbe=="lib"), aes(x=nitrogen, y=height, color=ID, shape=nitrogen)) +
+  geom_boxplot()
+
+ggplot(data=subset(data,microbe=="lib"), aes(x=nitrogen, y=chlorophyll, color=ID, shape=nitrogen)) + 
+  geom_boxplot()
+
+ggplot(data=subset(data,microbe=="lib"), aes(x=nitrogen, y=leaves, color=ID, shape=nitrogen)) + 
+  geom_boxplot()
+
+# as of 9 feb 2023, still need to figure out some aesthetic things with these plots. Can't get error bars to show up black, not sure about color or layout yet. Pretty but not practical!!
+
+```
