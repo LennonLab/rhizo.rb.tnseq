@@ -76,17 +76,17 @@ hist(leafcount$leaves, ylim=c(0,20)) #histogram
 
 ggplot(data=subset(potdata, as.numeric(potdata$ID) <= 10), aes(x=nitrogen, y=meanheight, color=ID, fill=ID, shape=nitrogen)) + 
   geom_col(position = position_dodge(), width = 0.75) +
-  geom_errorbar(aes(ymin=meanheight-SDheight, ymax=meanheight+SDheight), width = 0.2, position = position_dodge(0.75))
+  geom_errorbar(aes(ymin=meanheight-SDheight, ymax=meanheight+SDheight), width = 0.2, fill="black", color="black", position = position_dodge(0.75))
 
 ggplot(data=subset(potdata, as.numeric(potdata$ID) <= 10), aes(x=nitrogen, y=meanchloro, color=ID, fill=ID, shape=nitrogen)) + 
   geom_col(position = position_dodge(), width = 0.75) +
-  geom_errorbar(aes(ymin=meanchloro-SDchloro, ymax=meanchloro+SDchloro), width = 0.2, position = position_dodge(0.75))
+  geom_errorbar(aes(ymin=meanchloro-SDchloro, ymax=meanchloro+SDchloro), width = 0.2, fill="black", color="black", position = position_dodge(0.75))
 
 ggplot(data=subset(potdata, as.numeric(potdata$ID) <= 10), aes(x=nitrogen, y=meanleaves, color=ID, fill=ID, shape=nitrogen)) + 
   geom_col(position = position_dodge(), width = 0.75) +
-  geom_errorbar(aes(ymin=meanleaves-SDleaves, ymax=meanleaves+SDleaves), width = 0.2, position = position_dodge(0.75))
+  geom_errorbar(aes(ymin=meanleaves-SDleaves, ymax=meanleaves+SDleaves), width = 0.2, fill="black", color="black", position = position_dodge(0.75))
 
-#boxplots of the per-pot data (not sure if useful at all
+#boxplots of the per-pot data (not sure if useful at all)
 
 ggplot(data=subset(data,microbe=="lib"), aes(x=nitrogen, y=height, color=ID, shape=nitrogen)) +
   geom_boxplot()
@@ -98,5 +98,7 @@ ggplot(data=subset(data,microbe=="lib"), aes(x=nitrogen, y=leaves, color=ID, sha
   geom_boxplot()
 
 # as of 9 feb 2023, still need to figure out some aesthetic things with these plots. Can't get error bars to show up black, not sure about color or layout yet. Pretty but not practical!!
+
+# 13 feb 2023 figured out error bars but still not pleased with the beautiful pastel rainbow plots
 
 ```
