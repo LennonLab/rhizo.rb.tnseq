@@ -1,0 +1,15 @@
+Read 6281 genes, 45 exps, and data for 140593 barcodes
+Ignoring  setAIT001 setAIT002 setAIT003 setAIT004 setAIT005 setAIT006 setAIT007 setAIT008 setAIT009 setAIT010 setAIT011 setAIT012 setAIT013 setAIT014 setAIT015 setAIT016 setAIT017 setAIT018 setAIT019 setAIT020 setAIT025 setAIT034 setAIT036 setAIT038 
+Central Reads per t0set, in millions:
+7/13/2022 SmeliPlant 
+                  62 
+Time0 reads per gene: mean 11865.3 median 6619.0 ratio 1.79
+Genes with enough Time0 reads:  5175 
+Using  83934  of  89372  genic strains
+Using  5175  of  5294  genes with data
+For cor12, using  4214 genes
+status
+low_count     Time0 
+       16         5 
+low_count : setAIT021 setAIT022 setAIT023 setAIT024 setAIT026 setAIT027 setAIT028 setAIT029 setAIT030 setAIT031 setAIT032 setAIT033 setAIT035 setAIT037 setAIT039 setAIT040 
+Warning: 0 OK experiments
