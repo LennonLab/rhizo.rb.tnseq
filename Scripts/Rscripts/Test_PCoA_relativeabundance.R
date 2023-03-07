@@ -26,5 +26,4 @@ ggplot(pcoa.sites,aes(x=MDS1,y=MDS2,color=metadata$compartment,shape=metadata$Nt
         panel.border = element_rect(size = 1, colour = "black",fill=NA),
         panel.background = element_rect(fill="white"),
         axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
-        axis.text.y=element_text(size=rel(0.9)),
-        axis.title.x = element_blank())
+        axis.text.y=element_text(size=rel(0.9)))
