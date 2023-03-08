@@ -16,7 +16,7 @@ rm(list=ls())
 getwd() #clear workspace and set directory
 
 # will need to update following line to map to your files
-setwd("/Users/User/Desktop/thesis_stuff/R_working")
+setwd("~/Github/rhizo.rb.tnseq")
 
 ## Load packages and functions
 
@@ -48,6 +48,8 @@ data$date <- data$date-st.date #convert to days post inoculation
 
 data$date <- as.numeric(as.character(gsub(" days",replacement = "",x=data$date)))
 
+
+
 ```
 
 
@@ -60,13 +62,28 @@ data$date <- as.numeric(as.character(gsub(" days",replacement = "",x=data$date))
 
 individual_pot_plot <- data %>%
      group_by(ID) %>% 
-     summarise(nitrogen = nitrogen, meanheight = mean(height), SDheight=sd(height), meanchloro = mean(chlorophyll), SDchloro=sd(chlorophyll), meanleaves = mean(leaves), SDleaves=sd(leaves))  #groups data according to pot and calculates mean and SD for each stat for each pot
+     summarise(microbe = microbe, nitrogen = nitrogen, meanheight = mean(height), SDheight=sd(height), stabilityheight = ((1/SDheight) / meanheight), meanchloro = mean(chlorophyll), SDchloro=sd(chlorophyll), stabilitychloro = ((1/SDchloro) / meanchloro), meanleaves = mean(leaves), SDleaves=sd(leaves), stabilityleaves = ((1/SDleaves) / meanleaves))  #groups data according to pot and calculates mean and SD for each stat for each pot
 
 potdata <- individual_pot_plot %>% distinct() # cleans up duplicate rows in dataframe
 
 leafcount<-data %>% dplyr::filter(microbe == "lib") #creates histogram of leaf count data, including only the library dataset
 
 hist(leafcount$leaves, ylim=c(0,20)) #histogram
+
+#stability measure--inverse coefficient of variation
+
+stabilitydata<-potdata %>% dplyr::filter(microbe == "lib")
+
+ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilityheight, color=ID, fill=ID, shape=nitrogen)) + 
+  geom_col(position = position_dodge(), width = 0.75)
+
+ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilitychloro, color=ID, fill=ID, shape=nitrogen)) + 
+  geom_col(position = position_dodge(), width = 0.75)
+
+ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilityleaves, color=ID, fill=ID, shape=nitrogen)) + 
+  geom_col(position = position_dodge(), width = 0.75)
+
+#these plots are very rough atm, just trying to mess around with ways to display stability
 
 ```
 
@@ -102,3 +119,5 @@ ggplot(data=subset(data,microbe=="lib"), aes(x=nitrogen, y=leaves, color=ID, sha
 # 13 feb 2023 figured out error bars but still not pleased with the beautiful pastel rainbow plots
 
 ```
+
+
