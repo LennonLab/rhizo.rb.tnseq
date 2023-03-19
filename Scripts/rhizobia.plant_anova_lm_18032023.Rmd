@@ -15,7 +15,8 @@ editor_options:
 rm(list=ls())
 getwd()
 # will need to update following line to map to your files
- setwd("~/Github/rhizo.rb.tnseq")
+# setwd("~/Github/rhizo.rb.tnseq")
+ setwd("/Users/User/Desktop/thesis_stuff/R_working")
 
 
 ## Load packages and functions
@@ -43,7 +44,7 @@ se <- function(x) {sd(x)/sqrt(length(x))} #returns standard error of the given v
 
 # load data
 
-data <- read.csv("./Data/rhizobia.plant.csv")
+data <- read.csv("./rhizobia.plant.csv")
 
 
 ## Convert to factor/date variable
@@ -91,9 +92,11 @@ ggplot(data=data, aes(x=nitrogen,y=dry.biomass,color=microbe)) +
 ggplot(data=data, aes(x=date,y=dry.biomass,color=microbe,shape=nitrogen)) +
      geom_point() #if there looks to be a trend, add the time in the lm equation 
 
-#Welch's t-test to assess potential association between nitrogen and dry plant biomass, factoring in apo plots by dividing by the average
+#t-test to assess potential association between nitrogen and dry plant biomass, factoring in apo plots by dividing by the average
 
-ttest_mass <- t.test((libdata$dry.biomass/biomass_apos) ~ libdata$nitrogen, data=libdata, var.equal=FALSE)
+ttest_mass <- t.test((libdata$dry.biomass/biomass_apos) ~ libdata$nitrogen, data=libdata, var.equal=TRUE)
+
+ttest_mass
 
 #Publication-quality plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
@@ -112,8 +115,8 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanbioma
         axis.title.x = element_blank())
 
 #Linear model to generate residuals for normality testing. Log transform was determined unnecessary so was commented out
-biomass = lm(dry.biomass ~ nitrogen + date,data=subset(data,microbe=="lib"))
-# biomass = lm(log10(dry.biomass) ~ nitrogen,data=data)
+ biomass = lm(dry.biomass ~ nitrogen + date,data=subset(data,microbe=="lib"))
+# biomass = lm(log10(dry.biomass) ~ nitrogen + date,data=subset(data,microbe=="lib"))
 
 summary(biomass)
 AIC(biomass)
@@ -160,6 +163,8 @@ ggplot(data=data, aes(x=date,y=chlorophyll,color=microbe,shape=nitrogen)) +
 
 ttest_chloro <- t.test((libdata$chlorophyll/chloro_apos) ~ libdata$nitrogen, data=libdata, var.equal=FALSE)
 
+ttest_chloro
+
 #Publication-quality plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanchloro, color=microbe)) +
@@ -178,7 +183,7 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanchlor
 
 #Linear model for residuals
 chlorophyll = lm(chlorophyll ~ nitrogen + date,data=subset(data,microbe=="lib"))
-# chlorophyll = lm(log10(chlorophyll) ~ nitrogen,data=data)
+# chlorophyll = lm(log10(chlorophyll) ~ nitrogen + date,data=subset(data,microbe=="lib"))
 
 summary(chlorophyll)
 AIC(chlorophyll)
@@ -225,6 +230,8 @@ ggplot(data=data, aes(x=date,y=leaves,color=microbe,shape=nitrogen)) +
 
 ttest_leaves <- t.test((libdata$leaves/leaves_apos) ~ libdata$nitrogen, data=libdata, var.equal=FALSE)
 
+ttest_leaves
+
 #Plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanleaves, color=microbe)) +
@@ -243,8 +250,8 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanleave
         axis.title.x = element_blank())
 
 #Linear model for residuals
-leafcount = lm(leaves ~ nitrogen + date,data=subset(data, microbe=="lib"))
-# biomass = lm(log10(librarymass$nodule.biomass) ~ nitrogen,data=librarymass)
+# leafcount = lm(leaves ~ nitrogen + date,data=subset(data, microbe=="lib"))
+ leafcount = lm(log10(leaves) ~ nitrogen + date,data=subset(data, microbe=="lib"))
 
 summary(leafcount)
 AIC(leafcount)
@@ -283,15 +290,17 @@ summary(leaf.aov)
 
 #Initial assessment of data
 
-ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=nitrogen,y=height)) +
+ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=nitrogen,y=height,color=microbe)) +
      geom_boxplot()
 
-ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=date,y=height)) +
+ggplot(data=data %>% dplyr::filter(microbe != "pbs"), aes(x=date,y=height,color=microbe)) +
      geom_point() #if there looks to be a trend, add the time in the lm equation
 
-#Welch's t-test to assess potential association between nitrogen and dry plant biomass, factoring in apo plots by dividing by the average
+#t-test to assess potential association between nitrogen and dry plant biomass, factoring in apo plots by dividing by the average
 
-ttest_height <- t.test((libdata$height/height_apos) ~ libdata$nitrogen, data=libdata, var.equal=FALSE)
+ttest_height <- t.test((libdata$height/height_apos) ~ libdata$nitrogen, data=libdata, var.equal=TRUE)
+
+ttest_height
 
 #Plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
@@ -311,8 +320,8 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanheigh
         axis.title.x = element_blank())
 
 #Linear model for residuals
-height = lm(height ~ nitrogen + date,data=subset(data,microbe=="lib"))
-# height = lm(log10(height) ~ nitrogen,data=data)
+#height = lm(height ~ nitrogen + date,data=subset(data,microbe=="lib"))
+ height = lm(log10(height) ~ nitrogen + date,data=subset(data,microbe=="lib"))
 
 summary(height)
 AIC(height)

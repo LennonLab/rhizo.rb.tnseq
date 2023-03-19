@@ -16,7 +16,8 @@ rm(list=ls())
 getwd() #clear workspace and set directory
 
 # will need to update following line to map to your files
-setwd("~/Github/rhizo.rb.tnseq")
+setwd("/Users/User/Desktop/thesis_stuff/R_working")
+# setwd("~/Github/rhizo.rb.tnseq")
 
 ## Load packages and functions
 
@@ -74,13 +75,13 @@ hist(leafcount$leaves, ylim=c(0,20)) #histogram
 
 stabilitydata<-potdata %>% dplyr::filter(microbe == "lib")
 
-ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilityheight, color=ID, fill=ID, shape=nitrogen)) + 
+ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilityheight, color=nitrogen, fill=nitrogen, shape=nitrogen)) + 
   geom_col(position = position_dodge(), width = 0.75)
 
-ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilitychloro, color=ID, fill=ID, shape=nitrogen)) + 
+ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilitychloro, color=nitrogen, fill=nitrogen, shape=nitrogen)) + 
   geom_col(position = position_dodge(), width = 0.75)
 
-ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilityleaves, color=ID, fill=ID, shape=nitrogen)) + 
+ggplot(data=stabilitydata, aes(x=nitrogen, y=stabilityleaves, color=nitrogen, fill=nitrogen, shape=nitrogen)) + 
   geom_col(position = position_dodge(), width = 0.75)
 
 #these plots are very rough atm, just trying to mess around with ways to display stability
