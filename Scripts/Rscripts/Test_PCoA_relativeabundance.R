@@ -1,4 +1,6 @@
-rbdat = read.delim("~/Github/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts.tab")
+rbdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts.tab")
+# rbdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts.tab")
+
 rownames(rbdat) <- rbdat$comb
 rbdat = t(rbdat[,-c(1:4)])
 metadata = as.data.frame(matrix(ncol=2,nrow=21))
@@ -56,6 +58,7 @@ cleannames #these are meant to be passed through ordilabel() to create cleaner l
 
 rbrar <- rarecurve(rbdat, step = 500, sample = raremax, xlab = "Total barcodes", ylab = "Unique barcodes", col = "blue", cex = 0.5, label = FALSE)
 
+
 rbrar
 
-rareslope(rbdat, sample = raremax)
+gene_list <- scores(pcoa,display="species")
