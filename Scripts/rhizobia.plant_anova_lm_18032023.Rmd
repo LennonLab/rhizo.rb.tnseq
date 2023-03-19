@@ -7,7 +7,7 @@ header-includes:
 output: pdf_document
 geometry: margin=2.54cm
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 ## Clear workspace and set directory
@@ -104,7 +104,6 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanbioma
   geom_point(size=3) +
   geom_errorbar(aes(ymin=meanbiomass-CIbiomass, ymax=meanbiomass+CIbiomass), width=0.3) +
   ylab(expression(atop("Biomass [g]",paste("(mean \U00B1 95% CI, n = 5)")))) +
-  geom_hline(yintercept=1,linetype=2) +
   scale_y_continuous(limits=c(0,7),breaks=seq(0,7,by=1))+
     theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
@@ -147,6 +146,7 @@ summary(biomass.aov)
 
 
 ```
+
 ``` {r}
 
 # CHLOROPHYLL
@@ -170,8 +170,7 @@ ttest_chloro
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanchloro, color=microbe)) +
   geom_point(size=3) +
   geom_errorbar(aes(ymin=meanchloro-CIchloro, ymax=meanchloro+CIchloro), width=0.3) +
-    ylab(expression(atop("Chlorophyll content",paste("(mean \U00B1 95% CI, n = 5)")))) +
-  geom_hline(yintercept=1,linetype=2) +
+    ylab(expression(atop("Chlorophyll content [SPAD]",paste("(mean \U00B1 95% CI, n = 5)")))) +
   scale_y_continuous(limits=c(0,70),breaks=seq(0,70,by=10))+
   theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
@@ -237,9 +236,7 @@ ttest_leaves
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanleaves, color=microbe)) +
   geom_point(size=3) +
   geom_errorbar(aes(ymin=meanleaves-CIleaves, ymax=meanleaves+CIleaves), width=0.3) +
-  geom_hline(yintercept=1,linetype=2) +
   ylab(expression(atop("Leaf count",paste("(mean \U00B1 95% CI, n = 5)")))) +
-  geom_hline(yintercept=1,linetype=2) +
   scale_y_continuous(limits=c(0,400),breaks=seq(0,400,by=50))+
     theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
@@ -307,9 +304,7 @@ ttest_height
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanheight, color=microbe)) +
   geom_point(size=3) +
   geom_errorbar(aes(ymin=meanheight-CIheight, ymax=meanheight+CIheight),width=0.3) +
-  geom_hline(yintercept=1,linetype=2) +
    ylab(expression(atop("Plant height [cm]",paste("(mean \U00B1 95% CI, n = 5)")))) +
-  geom_hline(yintercept=1,linetype=2) +
   scale_y_continuous(limits=c(0,70),breaks=seq(0,70,by=10))+
     theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
