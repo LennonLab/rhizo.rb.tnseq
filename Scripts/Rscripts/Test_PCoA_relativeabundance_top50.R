@@ -61,4 +61,22 @@ rbrar <- rarecurve(rbdat, step = 500, sample = raremax, xlab = "Total barcodes",
 
 rbrar
 
-gene_list <- scores(pcoa,display="species")
+gene_list <- scores(pcoa,display="all")
+
+
+# the following is a ChatGPT-generated script to extract the 50 most abundant genes per experiment... wow!! 
+top_bc <- apply(rbdat, 1, function(x) {
+  sorted <- sort(x, decreasing = TRUE)
+  names(sorted)[1:50]
+})
+
+# Order the top species by their abundance
+ordered_top_bc <- apply(rbdat, 1, function(x) {
+  sorted <- sort(x, decreasing = TRUE)
+  names(sorted)[1:50][order(sorted[1:50], decreasing = TRUE)]
+})
+
+# Print the ordered top species for each row (site)
+print(ordered_top_bc)
+
+#end of the generated portion
