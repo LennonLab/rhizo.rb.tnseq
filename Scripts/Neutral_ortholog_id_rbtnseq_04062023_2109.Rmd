@@ -1,7 +1,7 @@
 ---
 title: "RBH_essential_and_nonessential_genes"
-author: "John McMullen"
-date: "4/15/2021"
+author: "John McMullen, Caleb Hill"
+date: "4/6/2023"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -12,14 +12,14 @@ Goal: match the RBH to whether or not genes are essential or not in the HMMER re
 
 #data
 ```{r}
-matches = read.delim("C:/Users/User/Desktop/analyze_Nfitness/out_smeliplant.txt",header=FALSE)
+matches = read.delim("~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/out_smeliplant.txt",header=FALSE)
 colnames(matches) <- c("wheatleyID", "rbtnseqID")
-non_estl = read.csv("C:/Users/User/Desktop/analyze_Nfitness/Rlv_nonessential gene list.csv")
+non_estl = read.csv("~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/Rlv_nonessential gene list.csv")
 non_estl$estl <- rep('N',nrow(non_estl))
-tnseq_genes_old = read.csv("C:/Users/User/Desktop/analyze_Nfitness/old_annotations_smeliplant.csv")
-tnseq_genes_prot = read.csv("C:/Users/User/Desktop/analyze_Nfitness/proteins_smeli.csv")
+tnseq_genes_old = read.csv("~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/old_annotations_smeliplant.csv")
+tnseq_genes_prot = read.csv("~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/proteins_smeli.csv")
 
-sog = read.csv("C:/Users/User/Desktop/analyze_Nfitness/aaseq2_smeliplant.csv") #sog = single orthologous genes
+sog = read.csv("~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/aaseq2_smeliplant.csv") #sog = single orthologous genes
 ```
 
 #match protein ids with the old locus tags
@@ -107,12 +107,12 @@ for(j in 1:nrow(sog)) {
 
 # ChatGPT was asked to assist in writing a version of the commented for loop which would successfully iterate across all entries in the tnseq_genes_prot$product column. It was specified in-prompt that an optimized, nested structure would be necessary to accomplish this; ChatGPT provided the which() argument and wrote the syntax of the second for loop.
 
-write.csv(sog,'C:/Users/User/Desktop/analyze_Nfitness/smeliplant_neutral.csv')
+write.csv(sog,'~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/smeliplant_neutral.csv')
 ```
 
 #Add the annotation data from eggnog mapper
 ```{r}
-cogs = read.csv("C:/Users/User/Desktop/analyze_Nfitness/emapper_analysis_smeliplant.csv")
+cogs = read.csv("~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/emapper_analysis_smeliplant.csv")
 cogs$essential = rep('A')
 
 for(i in 1:nrow(cogs)) {
@@ -121,72 +121,5 @@ for(i in 1:nrow(cogs)) {
   cogs[i,8] <- estl1
 }
 
-write.csv(cogs,'C:/Users/User/Desktop/analyze_Nfitness/smeliplant_neutral_cog.csv')
+write.csv(cogs,'~/Github/rhizo.rb.tnseq/Scripts/rbh_essentiality_supplies/smeliplant_neutral_cog.csv')
 ```
-
-#Assess whether there are differences in residue diversity by essentiality and replicon
-need to check the number of data points for each bin.
-```{r}
-library(car)
-library(emmeans)
-library(multcomp)
-library(ggplot2)
-
-#ANOVA to look at differences in diversity
-div.mdl.lm = lm(sqrt(mean.H) ~ replicon*estl, data = sog) #species
-summary(div.mdl.lm)
-
-#assess normality
-div.res.lm = residuals(div.mdl.lm)
-summary(div.res.lm)
-qqPlot(div.res.lm)
-hist(div.res.lm)
-boxplot(div.res.lm)
-shapiro.test(div.res.lm)
-#looks mostly normal; slight right skew
-
-#assess homoscedasticity
-plot(fitted(div.mdl.lm),div.res.lm);
-abline(h=0,lty=2);
-lines(smooth.spline(fitted(div.mdl.lm),div.res.lm));
-leveneTest(div.res.lm ~ replicon*estl, data = sog)
-#look okay
-
-Anova(div.mdl.lm,type=3)
-
-div.emm = emmeans(div.mdl.lm, ~ estl|replicon,type="response")
-pairs(div.emm)
-
-div.output = as.data.frame(div.emm)
-
-ggplot(div.output,aes(x=replicon,y=response,shape=estl)) +
-  geom_point(size=5,position = position_dodge(width=0.5)) +
-  geom_errorbar(aes(ymin=lower.CL,ymax=upper.CL),width=0.1,position = position_dodge(width=0.5))
-
-#summary table
-library(dplyr)
-sem <- function(x) {sd(x)/sqrt(length(x))}
-estl_repl <- sog %>% group_by(replicon,estl) %>% summarise(mean = mean(mean.H),sd = sd(mean.H),n = length(mean.H))
-```
-
-#obtain pseudo gene data from reference
-```{r}
-pseudo_matches = read.delim("/Users/johnmcmullen/Dropbox/docs/Lennon_Lab/Rhizobia_GEMS/Genomes/Reference/PseudoFinder_21Apr21/rbh/matches.txt",header=FALSE)
-colnames(pseudo_matches) <- c("wsm1325_ref","OG_rep_id")
-pseudo_matches$OG = sapply(strsplit(as.character(pseudo_matches[,2]),".fa"), `[`, 1)
-
-cogs$pseudo=rep('A')
-
-for(i in 1:nrow(cogs)) {
-  ogs1 = cogs[i,7]
-  estl1 = subset(pseudo_matches,OG_rep_id==ogs1,select=OG)[1,]
-  cogs[i,9] <- estl1
-}
-
-for(i in 1:nrow(cogs)) {
-  ifelse(is.na(cogs[i,9]),cogs[i,9] <- "intact", cogs[i,9] <- "pseudo")
-}
-
-write.csv(cogs,'/Users/johnmcmullen/Dropbox/docs/Lennon_Lab/Rhizobia_GEMS/Genomes/Analysis/RBH_tnseq_analysis/aa_sequence_diversity_replicon_neutral_cog_pseduo.csv')
-```
-
