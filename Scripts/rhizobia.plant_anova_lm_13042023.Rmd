@@ -30,6 +30,7 @@ require("qqplotr")
 library("car")
 library("tidyverse")
 
+
 # these are functions for summary statistics
  
 #LL.95 <- function(x) t.test(x)$conf.int[1]
@@ -98,6 +99,10 @@ ttest_mass <- t.test((libdata$dry.biomass/biomass_apos) ~ libdata$nitrogen, data
 
 ttest_mass
 
+ttest_rhizmass <- t.test((dry.biomass/biomass_apos) ~ microbe, data=subset(data, microbe!="pbs"), var.equal=FALSE)
+
+ttest_rhizmass
+
 #Publication-quality plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanbiomass, color=microbe)) +
@@ -114,8 +119,8 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanbioma
         axis.title.x = element_blank())
 
 #Linear model to generate residuals for normality testing. Log transform was determined unnecessary so was commented out
- biomass = lm(dry.biomass ~ nitrogen + date,data=subset(data,microbe=="lib"))
-# biomass = lm(log10(dry.biomass) ~ nitrogen + date,data=subset(data,microbe=="lib"))
+ biomass = lm(dry.biomass ~ nitrogen,data=subset(data,microbe=="lib"))
+# biomass = lm(log10(dry.biomass) ~ nitrogen,data=subset(data,microbe=="lib"))
 
 summary(biomass)
 AIC(biomass)
@@ -132,7 +137,7 @@ shapiro.test(biomass_res)
 #assess homoscedasticity of residuals
 plot(fitted(biomass),biomass_res);
 abline(h=0,lty=2);
-lines(smooth.spline(fitted(biomass),biomass_res)); #fairly even spread
+# lines(smooth.spline(fitted(biomass),biomass_res)); #fairly even spread
 leveneTest(biomass_res ~ nitrogen, data = subset(data,microbe=='lib')) #not significant
 #All looks okay
 
@@ -165,6 +170,10 @@ ttest_chloro <- t.test((libdata$chlorophyll/chloro_apos) ~ libdata$nitrogen, dat
 
 ttest_chloro
 
+ttest_rhizchloro <- t.test((chlorophyll/chloro_apos) ~ microbe, data=subset(data, microbe!="pbs"), var.equal=FALSE)
+
+ttest_rhizchloro
+
 #Publication-quality plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanchloro, color=microbe)) +
@@ -181,8 +190,8 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanchlor
         axis.title.x = element_blank())
 
 #Linear model for residuals
-chlorophyll = lm(chlorophyll ~ nitrogen + date,data=subset(data,microbe=="lib"))
-# chlorophyll = lm(log10(chlorophyll) ~ nitrogen + date,data=subset(data,microbe=="lib"))
+chlorophyll = lm(chlorophyll ~ nitrogen,data=subset(data,microbe=="lib"))
+# chlorophyll = lm(log10(chlorophyll) ~ nitrogen,data=subset(data,microbe=="lib"))
 
 summary(chlorophyll)
 AIC(chlorophyll)
@@ -199,7 +208,7 @@ shapiro.test(chlorophyll_res) #not significant
 #assess homoscedasticity of residuals
 plot(fitted(chlorophyll),chlorophyll_res);
 abline(h=0,lty=2);
-lines(smooth.spline(fitted(chlorophyll),chlorophyll_res)); #fairly even spread
+# lines(smooth.spline(fitted(chlorophyll),chlorophyll_res)); #fairly even spread
 leveneTest(chlorophyll_res ~ nitrogen , data = subset(data,microbe=="lib")) #not significant
 #All looks okay
 
@@ -231,6 +240,10 @@ ttest_leaves <- t.test((libdata$leaves/leaves_apos) ~ libdata$nitrogen, data=lib
 
 ttest_leaves
 
+ttest_rhizleaves <- t.test((leaves/leaves_apos) ~ microbe, data=subset(data, microbe!="pbs"), var.equal=FALSE)
+
+ttest_rhizleaves
+
 #Plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanleaves, color=microbe)) +
@@ -247,8 +260,8 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanleave
         axis.title.x = element_blank())
 
 #Linear model for residuals
-# leafcount = lm(leaves ~ nitrogen + date,data=subset(data, microbe=="lib"))
- leafcount = lm(log10(leaves) ~ nitrogen + date,data=subset(data, microbe=="lib"))
+# leafcount = lm(leaves ~ nitrogen,data=subset(data, microbe=="lib"))
+ leafcount = lm(log10(leaves) ~ nitrogen,data=subset(data, microbe=="lib"))
 
 summary(leafcount)
 AIC(leafcount)
@@ -265,7 +278,7 @@ shapiro.test(leafcount_res) #not significant
 #assess homoscedasticity of residuals
 plot(fitted(leafcount),leafcount_res);
 abline(h=0,lty=2);
-lines(smooth.spline(fitted(leafcount),leafcount_res)); #fairly even spread
+# lines(smooth.spline(fitted(leafcount),leafcount_res)); #fairly even spread
 leveneTest(leafcount_res ~ nitrogen, data = subset(data,microbe=="lib")) #not significant
 #All looks okay
 
@@ -299,6 +312,10 @@ ttest_height <- t.test((libdata$height/height_apos) ~ libdata$nitrogen, data=lib
 
 ttest_height
 
+ttest_rhizheight <- t.test((height/height_apos) ~ microbe, data=subset(data, microbe!="pbs"), var.equal=FALSE)
+
+ttest_rhizheight
+
 #Plot of means+/-CI for each measurement variable, including apos. Not sure about the purpose of the intercept line or if it looks how it's supposed to? 13 Feb 2023
 
 ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanheight, color=microbe)) +
@@ -315,8 +332,8 @@ ggplot(data=subset(plotmeans_data, microbe != "wt"), aes(x=nitrogen, y=meanheigh
         axis.title.x = element_blank())
 
 #Linear model for residuals
-#height = lm(height ~ nitrogen + date,data=subset(data,microbe=="lib"))
- height = lm(log10(height) ~ nitrogen + date,data=subset(data,microbe=="lib"))
+height = lm(height ~ nitrogen,data=subset(data,microbe=="lib"))
+ # height = lm(log10(height) ~ nitrogen,data=subset(data,microbe=="lib"))
 
 summary(height)
 AIC(height)
@@ -333,7 +350,7 @@ shapiro.test(height_res) #not significant
 #assess homoscedasticity of residuals
 plot(fitted(height),height_res);
 abline(h=0,lty=2);
-lines(smooth.spline(fitted(height),height_res)); #fairly even spread
+# lines(smooth.spline(fitted(height),height_res)); #fairly even spread
 leveneTest(height_res ~ nitrogen, data = subset(data,microbe=="lib")) #not significant
 #All looks okay
 
@@ -348,3 +365,14 @@ summary(height.aov)
 
 ```
 
+``` {r}
+#weighted anova to analyze nodule biomass
+
+nodbiomass.anova <- aov(nodule.biomass ~ nitrogen, data=libdata, weight=nodule.count)
+
+summary(nodbiomass.anova)
+
+nodbiomass.anova
+
+
+```
