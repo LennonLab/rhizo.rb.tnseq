@@ -99,9 +99,11 @@ RAC <- function(x = ""){
   return(x.ab.ranked)
 } #returns a rank-abundance dataset for a given site to be plotted
 
-RACmetadata <- subset(t(metadata), row.names(t(metadata)) %in% c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045"))
+RACmetadata <- metadata
 
-row.names(RACmetadata) <- c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045")
+row.names(RACmetadata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040", "041", "042", "043", "044", "045")
+
+RACmetadata <- subset(RACmetadata, row.names(RACmetadata) %in% c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045"))
 
 row.names(goodcountdat) <- c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045")
 
@@ -111,9 +113,14 @@ RACsubsetter <- RACsubsetter %>% mutate(group = paste(compartment, Ntreatment, s
 
 RACsubsetter <- RACsubsetter[, -c(5176:5177)]
 
+RACsubsetter <- RACsubsetter %>%
+  mutate(across(1:5175, as.numeric))
+
 RACdata <- RACsubsetter %>%
   group_by(group) %>%
   summarise(across(starts_with("SM"), mean))
+
+RAC_bactamb <- RAC(RACdata$bact-ambient)
                                                                         
 #this part of the script generates dissimilarity matrices for ranked gene fitness analyses
 
