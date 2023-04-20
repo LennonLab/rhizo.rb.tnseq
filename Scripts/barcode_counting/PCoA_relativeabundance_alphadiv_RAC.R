@@ -141,7 +141,8 @@ completefit <- merge(fitmetadata, fitdat, by.x = 1, by.y = 0)
 nodESfit <- subset(completefit, essentiality=="essential")
 nodNEfit <- subset(completefit, essentiality=="N") #fitness data subsetted into groups of interest
 
-nitrogengenes <- read.delim("C:/Users/User/Desktop/user_ko.txt", header=FALSE)
+nitrogengenes <- read.delim("C:/Users/User/Desktop/blastkoala_annotation_smeli.txt", header=FALSE)
+nitrogengenes <- read.delim("~/Github/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/blastkoala_annotation_smeli.txt", header=FALSE)
 
 nitrogengenes$V1 <- substr(nitrogengenes$V1, 7, 15)
 Nnames <- grep("^SMa", nitrogengenes$V1)
