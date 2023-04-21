@@ -1,3 +1,5 @@
+#load in data and create rearranged dataframes as needed for later analyses
+
 rbdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts.tab")
 # rbdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts.tab")
 
@@ -22,17 +24,13 @@ library(tidyverse)
 library(dplyr)
 require("psych")
 
-rel.dat = decostand(rbdat,method="total")
-
+rel.dat = decostand(rbdat,method="total") #standardize counts data by total
 relnewnames <- substr(row.names(rel.dat), 7, 9)
-
 relnewnames
-
 rownames(rel.dat) <- relnewnames #rename rows to extract number ID
 
 reldat2 <- subset(rel.dat, row.names(rel.dat) %in% c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040"))
-
-metadata2 <- subset(metadata, compartment!= "start") #reldat2 and metadata2 have the t0 data filtered out
+metadata2 <- subset(metadata, compartment!= "start") #reldat2 and metadata2 have the t0 data filtered out for pcoa, etc.
 
 
 
@@ -63,9 +61,7 @@ countzeros <- function(row) {
   return(percentzeros)
 } #returns the percentage of species found in each site
 
-
 percentfoundfit <- apply(goodcountdat, 1, countzeros) #calculates % found for each row (site)
-
 percentfoundfit
 
 S_obs <- function(x = ""){
@@ -73,7 +69,6 @@ S_obs <- function(x = ""){
 } #observed species richness in a given site
 
 richnessfit <-  S_obs(goodcountdat)
-
 richnessfit
 
 alphadiversitylib = as.data.frame(matrix(ncol=4,nrow=nrow(goodcountdat)))
@@ -81,14 +76,12 @@ colnames(alphadiversitylib) <- c('Shannon diversity','Evenness (SW)','% Found','
 rownames(alphadiversitylib) <- rownames(goodcountdat)
 
 alphadiversitylib[,1] <- shannonfit
-
 alphadiversitylib[,2] <- Evarfit
-
 alphadiversitylib[,3] <- percentfoundfit
-
 alphadiversitylib[,4] <- richnessfit
-
 alphadiversitylib #final collated dataframe of alpha diversity measures by pot
+
+
 
 #this part of the script produces rank-abundance curves for each treatment/compartment combination
 
@@ -100,29 +93,101 @@ RAC <- function(x = ""){
 } #returns a rank-abundance dataset for a given site to be plotted
 
 RACmetadata <- metadata
-
 row.names(RACmetadata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040", "041", "042", "043", "044", "045")
-
 RACmetadata <- subset(RACmetadata, row.names(RACmetadata) %in% c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045"))
-
 row.names(goodcountdat) <- c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045")
+#above block sets up row names and such to be merged and unmerged
 
 RACsubsetter <- as.data.frame(cbind(goodcountdat, RACmetadata))
-
-RACsubsetter <- RACsubsetter %>% mutate(group = paste(compartment, Ntreatment, sep = "-"))
-
-RACsubsetter <- RACsubsetter[, -c(5176:5177)]
+RACsubsetter <- RACsubsetter %>% mutate(group = paste(compartment, Ntreatment, sep = "_"))
+RACsubsetter <- RACsubsetter[, -c(5176:5177)] #merges metadata tags into a single unique treatment group ID
 
 RACsubsetter <- RACsubsetter %>%
-  mutate(across(1:5175, as.numeric))
+  mutate(across(1:5175, as.numeric)) #changes data to numeric
 
 RACdata <- RACsubsetter %>%
   group_by(group) %>%
-  summarise(across(starts_with("SM"), mean))
+  summarise(across(starts_with("SM"), mean)) #averages each treatment together and produces a table listing mean counts
 
-RAC_bactamb <- RAC(RACdata$bact-ambient)
-                                                                        
-#this part of the script generates dissimilarity matrices for ranked gene fitness analyses
+RACdata <- as.data.frame(RACdata)
+row.names(RACdata) <- RACdata[,1]
+RACdata <- RACdata[,-1] #cleans up dataframe so it can be unlisted and plotted
+
+bactambRAC <- unlist(RACdata[1,])
+bactfertRAC <- unlist(RACdata[2,])
+nodambRAC <- unlist(RACdata[3,])
+nodfertRAC <- unlist(RACdata[4,])
+t0RAC <- unlist(RACdata[5,]) #converts rows to proper format for RAC analysis and plotting
+
+RAC_bactamb <- RAC(bactambRAC)
+RAC_bactfert <- RAC(bactfertRAC)
+RAC_nodamb <- RAC(nodambRAC)
+RAC_nodfert <- RAC(nodfertRAC)
+RAC_t0 <- RAC(t0RAC)
+
+# rough example plots can be made using Qbio provided code; need to rewrite in ggplot
+
+plot.new()
+ranks <- as.vector(seq(1, length(RAC_t0)))
+opar <- par(no.readonly = TRUE)
+par(mar = c(5.1, 5.1, 4.1, 2.1))
+plot(ranks, log(RAC_t0), type = 'p', axes = F,
+     xlab = "Rank in abundance", ylab = "Abundance",
+     las = 1, cex.lab = 1.4, cex.axis = 1.25)
+
+box()
+axis(side = 1, labels = T, cex.axis = 1.25)
+axis(side = 2, las = 1, cex.axis = 1.25,
+     labels = c(1, 100, 10000, 100000, 1000000), at = log(c(1, 100, 10000, 100000, 1000000)))
+
+#Kolmogorov-Smirnov tests to determine if rank-abundance curves are significantly different between treatments
+
+
+
+
+#ranked fitness analysis conducted using similar methods to the rank-abundance tests
+
+rankfit <- function(x = ""){
+  x = as.vector(x)
+  x.ranked = x[order(x, decreasing = TRUE)]
+  return(x.ranked)
+} #version of the RAC function designed to rank fitness scores, which have negative and positive values
+
+rankfitdata <- t(fitdat)
+row.names(rankfitdata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040", "041", "042", "043", "044", "045")
+rankfitdata <- subset(rankfitdata, row.names(rankfitdata) %in% c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045"))
+rankfitdata <- cbind(RACsubsetter$group, rankfitdata)
+rankfitdata <- as.data.frame(rankfitdata)
+rankfitdata <- rankfitdata %>%
+  mutate(across(2:5176, as.numeric)) #results in a properly labeled and formatted dataframe to be grouped and meaned by treatment/compartment
+
+meanfitnessrank <- rankfitdata %>%
+  group_by(V1) %>%
+  summarise(across(starts_with("SM"), mean)) #table of meaned gene fitness per treatment/compartment group
+
+meanfitnessrank <- as.data.frame(meanfitnessrank)
+row.names(meanfitnessrank) <- meanfitnessrank[,1]
+meanfitnessrank <- meanfitnessrank[,-1] #cleans up and relabels rows by treatment/compartment group
+
+bactambrank <-unlist(meanfitnessrank[1,])
+bactfertrank <- unlist(meanfitnessrank[2,])
+nodambrank <- unlist(meanfitnessrank[3,])
+nodfertrank <- unlist(meanfitnessrank[4,])
+t0rank <- unlist(meanfitnessrank[5,])
+
+ranked_bactamb <- rankfit(bactambrank)
+ranked_bactfert <- rankfit(bactfertrank)
+ranked_nodamb <- rankfit(nodambrank)
+ranked_nodfert <- rankfit(nodfertrank)
+ranked_t0 <- rankfit(t0rank)
+
+#K-S tests of ranked fitness
+
+
+
+
+
+#this part of the script generates dissimilarity matrices for gene fitness analyses
 
 fitmetadata <- read.csv("C:/Users/User/Desktop/analyze_Nfitness/smeliplant_neutral_cog_clean.csv")
 #fitmetadata <- read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral_cog_clean.csv")
@@ -140,22 +205,19 @@ row.names(fitdat)[truenames] <- substr(row.names(fitdat)[truenames], 0, 7)
 truefitnames <- grep("^SMc", row.names(fitdat)) 
 row.names(fitdat)[truefitnames] <- gsub("\\s+$", "", row.names(fitdat)[truefitnames])  #remove trailing space from SMc names
 
-row.names(metadata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040", "041", "042", "043", "044", "045")
-
-metadata <- as.data.frame(t(metadata))
-
 completefit <- merge(fitmetadata, fitdat, by.x = 1, by.y = 0)
 nodESfit <- subset(completefit, essentiality=="essential")
 nodNEfit <- subset(completefit, essentiality=="N") #fitness data subsetted into groups of interest
 
+#to subset N metabolism genes, a blastKOALA annotation was conducted and N metabolism genes pulled from the KEGG reconstruction
 nitrogengenes <- read.delim("C:/Users/User/Desktop/blastkoala_annotation_smeli.txt", header=FALSE)
-nitrogengenes <- read.delim("~/Github/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/blastkoala_annotation_smeli.txt", header=FALSE)
+#nitrogengenes <- read.delim("~/Github/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/blastkoala_annotation_smeli.txt", header=FALSE)
 
 nitrogengenes$V1 <- substr(nitrogengenes$V1, 7, 15)
 Nnames <- grep("^SMa", nitrogengenes$V1)
 nitrogengenes$V1[Nnames] <- substr((nitrogengenes$V1)[Nnames], 0, 7)
 nitronames <- grep("^SMc", nitrogengenes$V1) 
-nitrogengenes$V1[nitronames] <- gsub("\\s+$", "", nitrogengenes$V1[nitronames])
+nitrogengenes$V1[nitronames] <- gsub("\\s+$", "", nitrogengenes$V1[nitronames]) #same name-cleaning process as above
 
 metabloci <- c("SMa0228", "SMc04028", "SMc04026", "SMa1250", "SM_b20986", "SMa1182", "SMc02150", "SMa0697", "SMc04083", "SMa0045", "SMc02613", "SMc00762", "SMc00948", "SMc01594", "SMc01973", "SMc02352", "SM_b20745", "SMa1276", "SMa1236", "SMa1233", "SM_b20436", "SMa0827", "SMa0825", "SMa0829", "SMa1273", "SMc04085", "SMa0585", "SMa0583", "SMa0581", "SM_b20985", "SM_b20984") #from Nmetabolismlist.txt, which is sourced from blastKOALA
 
@@ -207,6 +269,8 @@ pca_nodNE <- rda(scaled_nodNE, scale = TRUE)
 pca_complete <- rda(scaled_complete, scale = TRUE) #PCA analysis 
 
 
+
+#TENTATIVE GRAVEYARD ZONE
 
 #reorganizing script; here is the pcoa and rarefaction stuff, and the top 50/bottom 50 list
 
