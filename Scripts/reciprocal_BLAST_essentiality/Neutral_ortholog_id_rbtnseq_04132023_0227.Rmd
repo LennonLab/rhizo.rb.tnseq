@@ -1,0 +1,125 @@
+---
+title: "RBH_essential_and_nonessential_genes"
+author: "John McMullen, Caleb Hill"
+date: "4/6/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+This script uses the reciprocal BLAST hits generated from the rbh.py script
+
+Goal: match the RBH to whether or not genes are essential or not in the HMMER representative genes to indicate which orthologs may be neutral (i.e. nonessential to symbiosis)
+
+#data
+```{r}
+matches = read.delim("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/out_smeliplant.txt",header=FALSE)
+colnames(matches) <- c("wheatleyID", "rbtnseqID")
+non_estl = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/Rlv_nonessential gene list.csv")
+non_estl$estl <- rep('N',nrow(non_estl))
+tnseq_genes_old = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/old_annotations_smeliplant.csv")
+tnseq_genes_prot = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/proteins_smeli.csv")
+
+sog = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/aaseq2_smeliplant.csv") #sog = single orthologous genes
+```
+
+#match protein ids with the old locus tags
+```{r}
+#create a new dataframe to save the protein header name, the old locus tag and add the essentiality of the gene
+locus_ref = as.data.frame(matrix(ncol=5,nrow=nrow(tnseq_genes_prot)))
+colnames(locus_ref) <- c('prot_name','old_locus_tag','new_locus_tag','essential','orthogroup')
+
+locus_ref[,1] <- tnseq_genes_prot[,9]
+
+#add the old locus tag to the locus_ref
+for(j in 1:nrow(tnseq_genes_old)) {
+  locus_tag1 = tnseq_genes_prot[j,8]
+  old_locus_tag1 = subset(tnseq_genes_old,locus_tag==locus_tag1,select=old_locus_tag)[1,]
+  locus_ref[j,2] <- old_locus_tag1
+  locus_ref[j,3] <- locus_tag1
+}
+
+#add the neutral genes
+for(i in 1:nrow(locus_ref)) {
+  old_locustag1 = locus_ref[i,2]
+  estl1 = subset(non_estl,locus_match%in%old_locustag1,select=estl)[1,]
+  locus_ref[i,4] <- estl1
+}
+
+#add the essential genes
+for(i in 1:nrow(locus_ref)) {
+  ifelse(is.na(locus_ref[i,4]),locus_ref[i,4] <- 'essential',print(1))
+}
+
+#count the number of neutral genes
+nrow(locus_ref[locus_ref$essential=='N',]) #4856
+```
+
+#Add the orthogroup IDs
+```{r}
+
+
+#add essentiality to matches list
+for(i in 1:nrow(locus_ref)) {
+  id = locus_ref[i,2]
+  ogs1 = subset(matches,rbtnseqID==id,select=rbtnseqID)[1,]
+  locus_ref[i,5] <- ogs1
+}
+
+#add essentiality to the file
+sog$estl = rep('A')
+
+for(i in 1:nrow(sog)) {
+  id = sog[i,1]
+  estl1 = subset(locus_ref,orthogroup==id,select=essential)[1,]
+  sog[i,3] <- estl1
+}
+
+count = is.na(sog$estl)
+length(count[count==TRUE]) #16 genes we did not obtain a RBH for during analysis.
+
+#if there was no match, make it essential to be conservative
+for(i in 1:nrow(sog)) {
+  ifelse(is.na(sog[i,3]),sog[i,3] <- 'essential',print(i))
+}
+
+#count the number of neutral genes
+nrow(sog[sog$estl=='N',]) #1612, 65% are estimated as neutral genes
+
+#add gene description to sog file
+for(j in 1:nrow(sog)) {
+  oldtag = sog[j,1]
+  locusnew = subset(tnseq_genes_old, old_locus_tag==oldtag, select=locus_tag)[1,]
+  descr1_index = which(tnseq_genes_prot$locus_tag == locusnew)
+  for(k in descr1_index){
+    sog[j,4] <- tnseq_genes_prot[k, "product"]
+  }
+}
+
+# NOTE: this nested for loop was created with the help of ChatGPT. The original for loop, provided here, did not work properly:
+
+#add gene description to sog file
+#for(j in 1:nrow(sog)) {
+#  oldtag = sog[j,1]
+#  locusnew = subset(tnseq_genes_old, old_locus_tag==oldtag, select=locus_tag)[1,]
+#  descr1 = subset(tnseq_genes_prot, locus_tag=locusnew, select=product)[1,]
+#  sog[j,3] <- descr1
+#}
+
+# ChatGPT was asked to assist in writing a version of the commented for loop which would successfully iterate across all entries in the tnseq_genes_prot$product column. It was specified in-prompt that an optimized, nested structure would be necessary to accomplish this; ChatGPT provided the which() argument and wrote the syntax of the second for loop.
+
+write.csv(sog,'~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral.csv')
+```
+
+#Add the annotation data from eggnog mapper
+```{r}
+cogs = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/emapper_analysis_smeliplant.csv")
+cogs$essential = rep('A')
+
+for(i in 1:nrow(cogs)) {
+  ogs1 = cogs[i,2]
+  estl1 = subset(sog,orthogroup==ogs1,select=estl)[1,]
+  cogs[i,8] <- estl1
+}
+
+write.csv(cogs,'~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral_cog.csv')
+```
