@@ -1,0 +1,523 @@
+
+```{r }
+
+#load in data and create rearranged dataframes as needed for later analyses
+
+rbdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts.tab")
+# rbdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts.tab")
+
+fitdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/fit_logratios_clean.tab", row.names = 1)
+# fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
+
+goodfitdat <- fitdat[, c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45")]
+
+cleanrbdat = t(read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
+#cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
+goodcountdat <- subset(cleanrbdat, colnames(fitdat) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
+
+newcountnames <- substr(colnames(goodcountdat), 0, 9)
+colnames(goodcountdat) <- newcountnames #removes description from column names, leaving only locus id
+
+truecountnames <- grep("^SMa", colnames(goodcountdat))
+colnames(goodcountdat)[truecountnames] <- substr(colnames(goodcountdat)[truecountnames], 0, 7) #removes trailing characters from SMa ids
+finalcountnames <- grep("^SMc", colnames(goodcountdat))
+colnames(goodcountdat)[finalcountnames] <- gsub("\\s+$", "", colnames(goodcountdat)[finalcountnames]) #ditto for SMc ids
+
+rownames(rbdat) <- rbdat$comb
+rbdat = t(rbdat[,-c(1:4)])
+metadata = as.data.frame(matrix(ncol=2,nrow=21))
+metadata[,1] <-c(rep("nod",9),rep("bact",7),rep("start",5))
+metadata[,2] <-c(rep("fertilized",4),rep("ambient",5),rep("fertilized",4),rep("ambient",3),rep("time0",5))
+colnames(metadata) <- c("compartment","Ntreatment")  #this cleans up and labels data by treatment/compartment
+
+
+library(vegan)
+library(ggplot2)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+require("psych")
+
+rel.dat = decostand(rbdat,method="total") #standardize counts data by total
+relnewnames <- substr(row.names(rel.dat), 7, 9)
+relnewnames
+rownames(rel.dat) <- relnewnames #rename rows to extract number ID
+
+reldat2 <- subset(rel.dat, row.names(rel.dat) %in% c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040"))
+metadata2 <- subset(metadata, compartment!= "start") #reldat2 and metadata2 have the t0 data filtered out for pcoa, etc.
+
+```
+
+``` {r}
+
+# ALPHA DIVERSITY of library mutant
+
+shannonfit <- numeric(nrow(goodcountdat))
+for(j in 1:nrow(goodcountdat)) {
+  shannonfit[j] <- vegan::diversity(goodcountdat[j,], index = "shannon")
+}
+
+shannonfit #shannon diversity of lib
+
+Evar <- function(x) {
+  x <- as.vector(x[x > 0])
+  1 - (2/pi)*atan(var(log(x)))
+} #this function calculates the Smith and Wilson's Evenness for the given site
+
+Evarfit <- numeric(nrow(goodcountdat))
+for(j in 1:nrow(goodcountdat)) {
+  Evarfit[j] <- Evar(goodcountdat[j,])
+}
+
+Evarfit #evenness of lib in each pot
+
+countzeros <- function(row) {
+  numzeros <- sum(row == 0)
+  percentzeros <- 100 - (numzeros / length(row) * 100)
+  return(percentzeros)
+} #returns the percentage of species found in each site
+
+percentfoundfit <- apply(goodcountdat, 1, countzeros) #calculates % found for each row (site)
+percentfoundfit
+
+S_obs <- function(x = ""){
+  rowSums(x>0)*1
+} #observed species richness in a given site
+
+richnessfit <-  S_obs(goodcountdat)
+richnessfit
+
+alphadiversitylib = as.data.frame(matrix(ncol=4,nrow=nrow(goodcountdat)))
+colnames(alphadiversitylib) <- c('Shannon diversity','Evenness (SW)','% Found','Richness')
+rownames(alphadiversitylib) <- rownames(goodcountdat)
+
+alphadiversitylib[,1] <- shannonfit
+alphadiversitylib[,2] <- Evarfit
+alphadiversitylib[,3] <- percentfoundfit
+alphadiversitylib[,4] <- richnessfit
+alphadiversitylib #final collated dataframe of alpha diversity measures by pot
+
+```
+
+```{r}
+
+#RESEMBLANCE MATRICES for fitness analyses
+
+fitmetadata <- read.csv("C:/Users/User/Desktop/analyze_Nfitness/smeliplant_neutral_cog_clean.csv")
+#fitmetadata <- read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral_cog_clean.csv")
+
+fitmetadata <- fitmetadata[, -c(8:11)] #clean up empty columns
+fitmetadata <- fitmetadata[, -c(1)] #same here
+
+newnamesfitrel <- substr(row.names(goodfitdat), 0, 9) #remove description info from labels
+newnamesfitrel
+row.names(goodfitdat) <- newnamesfitrel
+
+truenames <- grep("^SMa", row.names(goodfitdat)) #remove trailing space and letter from SMa names
+row.names(goodfitdat)[truenames] <- substr(row.names(goodfitdat)[truenames], 0, 7) 
+
+truefitnames <- grep("^SMc", row.names(goodfitdat)) 
+row.names(goodfitdat)[truefitnames] <- gsub("\\s+$", "", row.names(goodfitdat)[truefitnames])  #remove trailing space from SMc names
+
+completefit <- merge(fitmetadata, goodfitdat, by.x = 1, by.y = 0)
+nodESfit <- subset(completefit, essentiality=="essential")
+nodNEfit <- subset(completefit, essentiality=="N") #fitness data subsetted into groups of interest
+
+#to subset N metabolism genes, a blastKOALA annotation was conducted and N metabolism genes pulled from the KEGG reconstruction
+nitrogengenes <- read.delim("C:/Users/User/Desktop/blastkoala_annotation_smeli.txt", header=FALSE)
+#nitrogengenes <- read.delim("~/Github/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/blastkoala_annotation_smeli.txt", header=FALSE)
+
+nitrogengenes$V1 <- substr(nitrogengenes$V1, 7, 15)
+Nnames <- grep("^SMa", nitrogengenes$V1)
+nitrogengenes$V1[Nnames] <- substr((nitrogengenes$V1)[Nnames], 0, 7)
+nitronames <- grep("^SMc", nitrogengenes$V1) 
+nitrogengenes$V1[nitronames] <- gsub("\\s+$", "", nitrogengenes$V1[nitronames]) #same name-cleaning process as above
+
+metabloci <- c("SMa0228", "SMc04028", "SMc04026", "SMa1250", "SM_b20986", "SMa1182", "SMc02150", "SMa0697", "SMc04083", "SMa0045", "SMc02613", "SMc00762", "SMc00948", "SMc01594", "SMc01973", "SMc02352", "SM_b20745", "SMa1276", "SMa1236", "SMa1233", "SM_b20436", "SMa0827", "SMa0825", "SMa0829", "SMa1273", "SMc04085", "SMa0585", "SMa0583", "SMa0581", "SM_b20985", "SM_b20984") #from Nmetabolismlist.txt, which is sourced from blastKOALA
+Nmetabolism <- subset(nitrogengenes, V1 %in% metabloci)
+Nmetabolismfit <- subset(completefit, completefit$locus_tag %in% Nmetabolism$V1) #N metabolism fitness subset
+
+fitmetadata <- fitmetadata[, -c(8:11)]
+
+nodESfit <- nodESfit[, -c(2:6)]
+nodNEfit <- nodNEfit[, -c(2:6)]
+completefit <- completefit[, -c(2:6)]
+Nmetabolismfit <- Nmetabolismfit[, -c(2:6)] #removes metadata from subsetted groups to get only the numerical data in the frame itself
+
+row.names(nodESfit) <- nodESfit[,1]
+nodESfit <- nodESfit[, -c(1)]
+
+row.names(nodNEfit) <- nodNEfit[,1]
+nodNEfit <- nodNEfit[, -c(1)]
+
+row.names(completefit) <- completefit[,1]
+completefit <- completefit[, -c(1)]
+
+row.names(Nmetabolismfit) <- Nmetabolismfit[,1]
+Nmetabolismfit <- Nmetabolismfit[, -c(1)] #updates names and deletes extra row
+
+nodESfit <- t(nodESfit)
+nodNEfit <- t(nodNEfit)
+completefit <- t(completefit)
+Nmetabolismfit <- t(Nmetabolismfit) #need to be flipped to this orientation for cluster diagrams etc
+
+dissim_nodES <- vegdist(nodESfit, method = "euclid", diag = FALSE)
+dissim_nodNE <- vegdist(nodNEfit, method = "euclid", diag = FALSE)
+dissim_complete <- vegdist(completefit, method = "euclid", diag = FALSE)
+dissim_Nmetabolism <- vegdist(Nmetabolismfit, method = "euclid", diag = FALSE) #resemblance matrices; still experimenting with different dissimilarity indices. Fitness data is log ratio data so it's kind of weird; might need to design one
+
+scaled_nodES <- scale(dissim_nodES)
+scaled_nodNE <- scale(dissim_nodNE)
+scaled_complete <- scale(dissim_complete)
+scaled_Nmetabolism <-scale(dissim_Nmetabolism) #autoscaled matrices
+
+cor_nodES <- cor(scaled_nodES)
+cor_nodNE <- (scaled_nodNE)
+cor_complete <- cor(scaled_complete)
+cor_Nmetabolism <- cor(scaled_Nmetabolism) #correlation matrices for downstream statistical analyses
+
+```
+```{r}
+
+# Ward's cluster diagrams
+# Ordination plot is in progress, but I wanted some quick and easy plots
+
+ward_nodES <- hclust(dissim_nodES, method = "ward.D2")
+ward_nodNE <- hclust(dissim_nodNE, method = "ward.D2")
+ward_complete <- hclust(dissim_complete, method = "ward.D2") 
+ward_Nmetabolism <- hclust(dissim_Nmetabolism, method = "ward.D2")
+
+par(mar = c(1, 5, 2, 2) + 0.1)
+plot(ward_nodES, main = "Ward's Clustering of sites by essential nodulation gene fitness", ylab = "Squared Euclidean Distance")
+plot(ward_nodNE, main = "Ward's Clustering of sites by nonessential nodulation gene fitness", ylab = "Squared Euclidean Distance")
+plot(ward_complete, main = "Ward's Clustering of sites by whole-genome fitness", ylab = "Squared Euclidean Distance") 
+plot(ward_Nmetabolism, main = "Ward's Clustering of sites by N metabolism gene fitness", ylab = "Squared Euclidean Distance")
+
+
+``` 
+
+
+``` {r}
+
+# RACs, fitness rankings, K-S  tests
+# This section definitely needs some redesign, see below
+
+RAC <- function(x = ""){
+  x = as.vector(x)
+  x.ab = x[x > 0]
+  x.ab.ranked = x.ab[order(x.ab, decreasing = TRUE)]
+  return(x.ab.ranked)
+} #returns a rank-abundance dataset for a given site to be plotted
+
+# Having an issue with this RAC function conceptually. Worried that it does not actually preserve adequate information to be used
+# for this purpose; gene names are obliterated by this function, and the outputted vector is just a set of counts or fitness scores. 
+# Shouldn't a ranked gene fitness analysis preserve both the count and the gene name information, so that the ranked order of genes
+# is being tested, rather than simply the counts or scores themselves?
+
+RACmetadata <- metadata
+row.names(RACmetadata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040", "041", "042", "043", "044", "045")
+RACmetadata <- subset(RACmetadata, row.names(RACmetadata) %in% c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045"))
+row.names(goodcountdat) <- c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045")
+#above block sets up row names and such to be merged and unmerged
+
+RACsubsetter <- as.data.frame(cbind(goodcountdat, RACmetadata))
+RACsubsetter <- RACsubsetter %>% mutate(group = paste(compartment, Ntreatment, sep = "_"))
+RACsubsetter <- RACsubsetter[, -c(5176:5177)] #merges metadata tags into a single unique treatment group ID
+
+RACsubsetter <- RACsubsetter %>%
+  mutate(across(1:5175, as.numeric)) #changes data to numeric
+
+RACdata <- RACsubsetter %>%
+  group_by(group) %>%
+  summarise(across(starts_with("SM"), mean)) #averages each treatment together and produces a table listing mean counts
+
+RACdata <- as.data.frame(RACdata)
+row.names(RACdata) <- RACdata[,1]
+RACdata <- RACdata[,-1] #cleans up dataframe so it can be unlisted and plotted
+
+colnames(RACdata) <- substr(colnames(RACdata), 0, 9)
+RACnames <- grep("^SMa", colnames(RACdata))
+colnames(RACdata)[RACnames] <- substr((colnames(RACdata))[RACnames], 0, 7)
+trueRACnames <- grep("^SMc", colnames(RACdata)) 
+colnames(RACdata)[trueRACnames] <- gsub("\\s+$", "", colnames(RACdata)[trueRACnames]) #ensures column names are exactly the same as the ones in Nmetabolism for matching genes of interest
+
+RACdata_Nmetabolism <- RACdata[, intersect(colnames(RACdata), Nmetabolism$V1)] #similar code from elsewhere wasn't working, so I asked chatGPT to suggest a new method and it gave me the intersect() syntax within this
+
+bactambRAC <- unlist(RACdata[1,])
+bactfertRAC <- unlist(RACdata[2,])
+nodambRAC <- unlist(RACdata[3,])
+nodfertRAC <- unlist(RACdata[4,])
+t0RAC <- unlist(RACdata[5,]) #converts rows to proper format for RAC analysis and plotting
+
+RAC_bactamb <- RAC(bactambRAC)
+RAC_bactfert <- RAC(bactfertRAC)
+RAC_nodamb <- RAC(nodambRAC)
+RAC_nodfert <- RAC(nodfertRAC)
+RAC_t0 <- RAC(t0RAC)
+
+#RACs for N metabolism genes
+Nmetab_bactambRAC <- unlist(RACdata_Nmetabolism[1,])
+Nmetab_bactfertRAC <- unlist(RACdata_Nmetabolism[2,])
+Nmetab_nodambRAC <- unlist(RACdata_Nmetabolism[3,])
+Nmetab_nodfertRAC <- unlist(RACdata_Nmetabolism[4,])
+Nmetab_t0RAC <- unlist(RACdata_Nmetabolism[5,])
+
+RAC_Nmetab_bactamb <- RAC(Nmetab_bactambRAC)
+RAC_Nmetab_bactfert <- RAC(Nmetab_bactfertRAC)
+RAC_Nmetab_nodamb <- RAC(Nmetab_nodambRAC)
+RAC_Nmetab_nodfert <- RAC(Nmetab_nodfertRAC)
+RAC_Nmetab_t0 <- RAC(Nmetab_t0RAC)
+
+# rough example plots can be made using Qbio provided code; need to rewrite in ggplot
+
+plot.new()
+ranks <- as.vector(seq(1, length(RAC_t0)))
+opar <- par(no.readonly = TRUE)
+par(mar = c(5.1, 5.1, 4.1, 2.1))
+plot(ranks, log(RAC_t0), type = 'p', axes = F,
+     xlab = "Rank in abundance", ylab = "Abundance",
+     las = 1, cex.lab = 1.4, cex.axis = 1.25)
+
+box()
+axis(side = 1, labels = T, cex.axis = 1.25)
+axis(side = 2, las = 1, cex.axis = 1.25,
+     labels = c(1, 100, 10000, 100000, 1000000), at = log(c(1, 100, 10000, 100000, 1000000)))
+
+#Kolmogorov-Smirnov tests to determine if rank-abundance curves are significantly different between treatments
+
+# These may need to be redone after an overhaul of the RAC function. As it stands, these tests do not preserve the ranked order
+# of genes in the vector, only the counts/scores themselves. Not sure if information is being lost here, but it likely is, and 
+# these tests probably aren't quite there yet as a result. Also might need to transform the data to get better resolution on the empirical
+# CDF comparison?
+
+ks_bacteroid <- ks.test(RAC_bactamb, RAC_bactfert, exact = TRUE)
+ks_nodule <- ks.test(RAC_nodamb, RAC_nodfert, exact = TRUE)
+
+ks_amb_compartment <- ks.test(RAC_nodamb, RAC_bactamb, exact = TRUE)
+ks_fert_compartment <- ks.test(RAC_bactfert, RAC_nodfert, exact = TRUE)
+
+#K-S test for specifically the N metabolism gene set
+
+# NOTE that these may need to be transformed to improve resolution
+
+ks_bacteroid_Nmetab <- ks.test(RAC_Nmetab_bactamb, RAC_Nmetab_bactfert, exact = TRUE)
+ks_nodule_Nmetab <- ks.test(RAC_Nmetab_nodamb, RAC_Nmetab_nodfert, exact = TRUE)
+
+ks_amb_compartment_Nmetab <- ks.test(RAC_Nmetab_nodamb, RAC_Nmetab_bactamb, exact = TRUE)
+ks_fert_compartment_Nmetab <- ks.test(RAC_Nmetab_bactfert, RAC_Nmetab_nodfert, exact = TRUE)
+
+#ranked fitness analysis conducted using similar methods to the rank-abundance tests
+
+# NOTE these also may need transformation for resolution purposes
+
+rankfit <- function(x = ""){
+  x = as.vector(x)
+  x.ranked = x[order(x, decreasing = TRUE)]
+  return(x.ranked)
+} #version of the RAC function designed to rank fitness scores, which have negative and positive values
+
+rankfitdata <- t(goodfitdat)
+row.names(rankfitdata) <- c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045")
+rankfitdata <- cbind(RACsubsetter$group, rankfitdata)
+rankfitdata <- as.data.frame(rankfitdata)
+rankfitdata <- rankfitdata %>%
+  mutate(across(2:5176, as.numeric)) #results in a properly labeled and formatted dataframe to be grouped and meaned by treatment/compartment
+
+meanfitnessrank <- rankfitdata %>%
+  group_by(V1) %>%
+  summarise(across(starts_with("SM"), mean)) #table of meaned gene fitness per treatment/compartment group
+
+meanfitnessrank <- as.data.frame(meanfitnessrank)
+row.names(meanfitnessrank) <- meanfitnessrank[,1]
+meanfitnessrank <- meanfitnessrank[,-1] #cleans up and relabels rows by treatment/compartment group
+
+meanfitnessrank_Nmetab <- meanfitnessrank[, intersect(colnames(meanfitnessrank), Nmetabolism$V1)]
+
+bactambrank <-unlist(meanfitnessrank[1,])
+bactfertrank <- unlist(meanfitnessrank[2,])
+nodambrank <- unlist(meanfitnessrank[3,])
+nodfertrank <- unlist(meanfitnessrank[4,])
+t0rank <- unlist(meanfitnessrank[5,])
+
+ranked_bactamb <- rankfit(bactambrank)
+ranked_bactfert <- rankfit(bactfertrank)
+ranked_nodamb <- rankfit(nodambrank)
+ranked_nodfert <- rankfit(nodfertrank)
+ranked_t0 <- rankfit(t0rank)
+
+#fitness rankings for the N metabolism gene set only
+Nmetab_bactambrank <-unlist(meanfitnessrank_Nmetab[1,])
+Nmetab_bactfertrank <- unlist(meanfitnessrank_Nmetab[2,])
+Nmetab_nodambrank <- unlist(meanfitnessrank_Nmetab[3,])
+Nmetab_nodfertrank <- unlist(meanfitnessrank_Nmetab[4,])
+Nmetab_t0rank <- unlist(meanfitnessrank_Nmetab[5,])
+
+Nmetab_ranked_bactamb <- rankfit(Nmetab_bactambrank)
+Nmetab_ranked_bactfert <- rankfit(Nmetab_bactfertrank)
+Nmetab_ranked_nodamb <- rankfit(Nmetab_nodambrank)
+Nmetab_ranked_nodfert <- rankfit(Nmetab_nodfertrank)
+Nmetab_ranked_t0 <- rankfit(Nmetab_t0rank)
+
+# K-S tests of ranked fitness
+
+# These may need to be redone after an overhaul of the rankfit function. As it stands, these tests do not preserve the ranked order
+# of genes in the vector, only the counts/scores themselves. Not sure if information is being lost here, but it likely is, and 
+# these tests probably aren't quite there yet as a result. Also might need to transform the data to get better resolution on the empirical
+# CDF comparison?
+
+ks_bacteroid_fit <- ks.test(ranked_bactamb, ranked_bactfert, exact = TRUE)
+ks_nodule_fit <- ks.test(ranked_nodamb, ranked_nodfert, exact = TRUE)
+
+ks_amb_compartment_fit <- ks.test(ranked_nodamb, ranked_bactamb, exact = TRUE)
+ks_fert_compartment_fit <- ks.test(ranked_bactfert, ranked_nodfert, exact = TRUE)
+
+# K-S tests for ranked N metabolism fitness
+
+# These may need to be redone after an overhaul of the rankfit function. As it stands, these tests do not preserve the ranked order
+# of genes in the vector, only the counts/scores themselves. Not sure if information is being lost here, but it likely is, and 
+# these tests probably aren't quite there yet as a result. Also might need to transform the data to get better resolution on the empirical
+# CDF comparison?
+
+ks_bacteroid_Nmetab_fit <- ks.test(Nmetab_ranked_bactamb, Nmetab_ranked_bactfert, exact = TRUE)
+ks_nodule_Nmetab_fit <- ks.test(Nmetab_ranked_nodamb, Nmetab_ranked_nodfert, exact = TRUE)
+
+ks_amb_compartment_Nmetab_fit <- ks.test(Nmetab_ranked_nodamb, Nmetab_ranked_bactamb, exact = TRUE)
+ks_fert_compartment_Nmetab_fit <- ks.test(Nmetab_ranked_bactfert, Nmetab_ranked_nodfert, exact = TRUE)
+
+```
+
+```{r}
+
+# PCA analysis to ordinate data; WORK IN PROGRESS 
+
+KMO(cor_nodES)
+KMO(cor_nodNE)
+KMO(cor_complete)
+KMO(cor_Nmetabolism)
+
+cortest.bartlett(cor_nodES, n = nrow(cor_nodES))
+cortest.bartlett(cor_nodNE, n = nrow(cor_nodNE))
+cortest.bartlett(cor_complete, n = nrow(cor_complete))
+cortest.bartlett(cor_Nmetabolism, n = nrow(cor_Nmetabolism))
+
+pca_nodES <- rda(scaled_nodES, scale = TRUE)
+pca_nodNE <- rda(scaled_nodNE, scale = TRUE)
+pca_complete <- rda(scaled_complete, scale = TRUE) 
+pca_Nmetabolism <- rda(scaled_Nmetabolism, scale = TRUE) #PCA analysis 
+
+#nice ggplots of the PCA analyses
+
+#nodES
+
+#nodNE
+
+#Nmetabolism
+
+#complete
+
+```
+
+```{r}
+
+# PERMANOVA analyses of each resemblance matrix
+
+permanova_metadata <- metadata
+row.names(permanova_metadata) <- c("X21", "X22", "X23", "X24", "X26", "X27", "X28", "X29", "X3X", "X31", "X32", "X33", "X35", "X37", "X39", "X4X", "X41", "X42", "X43", "X44", "X45")
+
+finalperm_metadata <- subset(permanova_metadata, row.names(permanova_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
+
+attr(scaled_nodES, "Site") <- row.names(finalperm_metadata)
+attr(scaled_nodES, "Ntreatment") <- finalperm_metadata$Ntreatment
+attr(scaled_nodES, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
+
+attr(scaled_nodNE, "Site") <- row.names(finalperm_metadata)
+attr(scaled_nodNE, "Ntreatment") <- finalperm_metadata$Ntreatment
+attr(scaled_nodNE, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
+
+attr(scaled_complete, "Site") <- row.names(finalperm_metadata)
+attr(scaled_complete, "Ntreatment") <- finalperm_metadata$Ntreatment
+attr(scaled_complete, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
+
+attr(scaled_Nmetabolism, "Site") <- row.names(finalperm_metadata)
+attr(scaled_Nmetabolism, "Ntreatment") <- finalperm_metadata$Ntreatment
+attr(scaled_Nmetabolism, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
+
+adonis2(Site ~ Ntreatment/Compartment, data = scaled_nodES)
+
+adonis2(Site ~ Ntreatment/Compartment, data = scaled_nodNE)
+
+adonis2(Site ~ Ntreatment/Compartment, data = scaled_complete)
+
+adonis2(Site ~ Ntreatment/Compartment, data = scaled_Nmetabolism)
+
+
+```
+
+
+```{r}
+
+#PCoA plots of each resemblance matrix
+
+
+```
+
+```{r}
+
+# TENTATIVE GRAVEYARD ZONE
+
+
+
+#reorganizing script; here is the pcoa and rarefaction stuff, and the top 50/bottom 50 list
+
+pcoa = capscale(reldat2~1,distance = "bray")
+head(summary(pcoa))
+biplot(pcoa)
+pcoa.sites = scores(pcoa,display = "sites") #see loadings, takes awhile
+
+pcoa.sites = as.data.frame(scores(pcoa,display = "sites"))
+
+ggplot(pcoa.sites,aes(x=MDS1,y=MDS2,color=metadata2$compartment,shape=metadata2$Ntreatment)) +
+  geom_point(size=8)+
+  xlab("PCo 1 (18%)") +
+  ylab("PCo 2 (14%)") +
+  theme_bw(base_size = 30) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(size = 1, colour = "black",fill=NA),
+        panel.background = element_rect(fill="white"),
+        axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
+        axis.text.y=element_text(size=rel(0.9))) #initial pcoa assessment to see where the groups fall
+
+# rarefaction curve
+
+counting <- rowSums(rbdat) #total reads per site/pot
+counting
+
+raremax <- min(rowSums(rbdat))
+raremax #smallest number of reads for a site
+
+Srare <- rarefy(rbdat, raremax)
+Srare #rare genes
+
+labelnames <- data.frame(rownames(rbdat)) #make smaller labels for rarefaction curve 
+shortnames <- str_sub(labelnames$rownames.rbdat., 7, 22)
+shortnames
+
+cleannames <- gsub('\\.', ' ',shortnames)
+numbersonly <- substring(labelnames$rownames.rbdat., 7, 9)
+cleannames #these are meant to be passed through ordilabel() to create cleaner labels for the rarefaction curve but I'm still working on the syntax
+
+rownames(rbdat) <- numbersonly
+cols <- c("darkred", "darkred", "darkred", "darkred", "forestgreen", "forestgreen", "forestgreen", "forestgreen", "forestgreen", "blue", "blue", "blue", "blue", "purple", "purple", "purple", "orange", "orange","orange","orange","orange")
+
+rbrar <- rarecurve(rbdat, step = 500, sample = 1000000, xlab = "Total barcodes", ylab = "Unique barcodes", col = cols, cex = 0.5, label = TRUE)
+rbrar
+```
+
+
+
+---
+title: PCoA_relativeabundance_alphadiv_RAC.R
+author: User
+date: '2023-04-21'
+
+---
