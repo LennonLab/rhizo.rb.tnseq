@@ -7,7 +7,7 @@ fitdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/h
 # fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
 
 cleanrbdat = t(read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
-
+#cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
 goodcountdat <- subset(cleanrbdat, colnames(fitdat) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
 
 rownames(rbdat) <- rbdat$comb
@@ -220,9 +220,7 @@ nitronames <- grep("^SMc", nitrogengenes$V1)
 nitrogengenes$V1[nitronames] <- gsub("\\s+$", "", nitrogengenes$V1[nitronames]) #same name-cleaning process as above
 
 metabloci <- c("SMa0228", "SMc04028", "SMc04026", "SMa1250", "SM_b20986", "SMa1182", "SMc02150", "SMa0697", "SMc04083", "SMa0045", "SMc02613", "SMc00762", "SMc00948", "SMc01594", "SMc01973", "SMc02352", "SM_b20745", "SMa1276", "SMa1236", "SMa1233", "SM_b20436", "SMa0827", "SMa0825", "SMa0829", "SMa1273", "SMc04085", "SMa0585", "SMa0583", "SMa0581", "SM_b20985", "SM_b20984") #from Nmetabolismlist.txt, which is sourced from blastKOALA
-
 Nmetabolism <- subset(nitrogengenes, V1 %in% metabloci)
-
 Nmetabolismfit <- subset(completefit, completefit$locus_tag %in% Nmetabolism$V1) #N metabolism fitness subset
 
 fitmetadata <- fitmetadata[, -c(8:11)]
@@ -295,35 +293,26 @@ ggplot(pcoa.sites,aes(x=MDS1,y=MDS2,color=metadata2$compartment,shape=metadata2$
 # rarefaction curve
 
 counting <- rowSums(rbdat) #total reads per site/pot
-
 counting
 
 raremax <- min(rowSums(rbdat))
-
 raremax #smallest number of reads for a site
 
 Srare <- rarefy(rbdat, raremax)
-
 Srare #rare genes
 
 labelnames <- data.frame(rownames(rbdat)) #make smaller labels for rarefaction curve 
-
 shortnames <- str_sub(labelnames$rownames.rbdat., 7, 22)
-
 shortnames
 
 cleannames <- gsub('\\.', ' ',shortnames)
-
 numbersonly <- substring(labelnames$rownames.rbdat., 7, 9)
-
 cleannames #these are meant to be passed through ordilabel() to create cleaner labels for the rarefaction curve but I'm still working on the syntax
 
 rownames(rbdat) <- numbersonly
-
 cols <- c("darkred", "darkred", "darkred", "darkred", "forestgreen", "forestgreen", "forestgreen", "forestgreen", "forestgreen", "blue", "blue", "blue", "blue", "purple", "purple", "purple", "orange", "orange","orange","orange","orange")
 
 rbrar <- rarecurve(rbdat, step = 500, sample = 1000000, xlab = "Total barcodes", ylab = "Unique barcodes", col = cols, cex = 0.5, label = TRUE)
-
 rbrar
 
 # the following is a ChatGPT-generated script to extract the 50 most abundant genes per experiment... wow!! 
@@ -357,12 +346,9 @@ ordered_top_fit <- apply(fitdat, 2, function(x) {
 })
 
 orderedtopfit <- ordered_top_fit[,-1:-2]
-
-# Print the ordered top species for each column (species)
-print(orderedtopfit)
+print(orderedtopfit) # Print the ordered top species for each column (species)
 
 bottom50genes <- t(orderedtopfit) #the bc insertionally inactivates the gene, so more bc in the t1 sample = beneficial inactivation = lower fitness
-
 lowest50fit <- cbind(metadata,bottom50genes) #generates list of 50 genes with lowest fitness values per treatment, with metadata
 
 #the following code will produce a list of the 50 genes with the highest fitness
@@ -380,14 +366,10 @@ ordered_bottom_fit <- apply(fitdat, 2, function(x) {
 })
 
 orderedbottomfit <- ordered_bottom_fit[,-1:-2]
-
-# Print the ordered bottom species for each column (species)
-print(orderedbottomfit)
+print(orderedbottomfit) # Print the ordered bottom species for each column (species)
 
 top50genes <- t(orderedbottomfit)
-
 top50fit <- cbind(metadata,top50genes) #like lowest50 but with the highest fitness
 
 # write.csv(lowest50fit, "C:/Users/User/Desktop/lowest50fitgenes.csv", row.names = TRUE)
-
 # write.csv(top50fit, "C:/Users/User/Desktop/top50fitgenes.csv", row.names = TRUE)
