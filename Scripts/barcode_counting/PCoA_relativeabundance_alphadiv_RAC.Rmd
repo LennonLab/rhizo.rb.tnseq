@@ -172,11 +172,38 @@ scaled_complete <- scale(dissim_complete)
 scaled_Nmetabolism <-scale(dissim_Nmetabolism) #autoscaled matrices
 
 cor_nodES <- cor(scaled_nodES)
-cor_nodNE <- (scaled_nodNE)
+cor_nodNE <- cor(scaled_nodNE)
 cor_complete <- cor(scaled_complete)
 cor_Nmetabolism <- cor(scaled_Nmetabolism) #correlation matrices for downstream statistical analyses
 
 ```
+
+
+```{r}
+
+# PERMANOVA analyses of each resemblance matrix
+
+permanova_metadata <- metadata
+row.names(permanova_metadata) <- c("X21", "X22", "X23", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X33", "X35", "X37", "X39", "X40", "X41", "X42", "X43", "X44", "X45")
+
+finalperm_metadata <- subset(permanova_metadata, row.names(permanova_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
+
+finalperm_metadata$potID <- c("1", "2", "4", "6", "7", "8", "9", "10", "2", "3", "5", "7", "10", "t0", "t0", "t0", "t0", "t0")
+
+nodES_permanova <- adonis2(as.data.frame(scaled_nodES) ~ finalperm_metadata$Ntreatment/finalperm_metadata$compartment, data = as.data.frame(scaled_nodES), strata = finalperm_metadata$potID, method="euclidean")
+
+nodNE_permanova <- adonis2(as.data.frame(scaled_nodNE) ~ finalperm_metadata$Ntreatment/finalperm_metadata$compartment, data = as.data.frame(scaled_nodNE), strata = finalperm_metadata$potID, method="euclidean")
+
+complete_permanova <- adonis2(as.data.frame(scaled_complete) ~ finalperm_metadata$Ntreatment/finalperm_metadata$compartment, data = as.data.frame(scaled_complete), strata = finalperm_metadata$potID, method="euclidean")
+
+Nmetabolism_permanova <- adonis2(as.data.frame(scaled_Nmetabolism) ~ finalperm_metadata$Ntreatment/finalperm_metadata$compartment, data = as.data.frame(scaled_Nmetabolism), strata = finalperm_metadata$potID, method="euclidean")
+
+
+```
+
+
+
+
 ```{r}
 
 # Ward's cluster diagrams
@@ -187,11 +214,18 @@ ward_nodNE <- hclust(dissim_nodNE, method = "ward.D2")
 ward_complete <- hclust(dissim_complete, method = "ward.D2") 
 ward_Nmetabolism <- hclust(dissim_Nmetabolism, method = "ward.D2")
 
+wardlabels <- paste(finalperm_metadata$compartment, finalperm_metadata$Ntreatment, sep = "_")
+wardlabels <- as.data.frame(wardlabels)
+row.names(wardlabels) <- row.names(finalperm_metadata)
+wardlabels$potID <- c("pot1_", "pot2_", "pot4_", "pot6_", "pot7_", "pot8_", "pot9_", "pot10_", "pot2_", "pot3_", "pot5_", "pot7_", "pot10_", "", "", "", "", "")
+wardlabels <- paste(wardlabels$potID, wardlabels$wardlabels, sep = "")
+
+
 par(mar = c(1, 5, 2, 2) + 0.1)
-plot(ward_nodES, main = "Ward's Clustering of sites by essential nodulation gene fitness", ylab = "Squared Euclidean Distance")
-plot(ward_nodNE, main = "Ward's Clustering of sites by nonessential nodulation gene fitness", ylab = "Squared Euclidean Distance")
-plot(ward_complete, main = "Ward's Clustering of sites by whole-genome fitness", ylab = "Squared Euclidean Distance") 
-plot(ward_Nmetabolism, main = "Ward's Clustering of sites by N metabolism gene fitness", ylab = "Squared Euclidean Distance")
+plot(ward_nodES, main = "Ward's Clustering of sites by essential nodulation gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
+plot(ward_nodNE, main = "Ward's Clustering of sites by nonessential nodulation gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
+plot(ward_complete, main = "Ward's Clustering of sites by whole-genome fitness", ylab = "Squared Euclidean Distance", labels = wardlabels) 
+plot(ward_Nmetabolism, main = "Ward's Clustering of sites by N metabolism gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
 
 
 ``` 
@@ -243,6 +277,10 @@ colnames(RACdata)[trueRACnames] <- gsub("\\s+$", "", colnames(RACdata)[trueRACna
 
 RACdata_Nmetabolism <- RACdata[, intersect(colnames(RACdata), Nmetabolism$V1)] #similar code from elsewhere wasn't working, so I asked chatGPT to suggest a new method and it gave me the intersect() syntax within this
 
+RACdata_nodNE <- RACdata[, intersect(colnames(RACdata), colnames(nodNEfit))]
+RACdata_nodES <- RACdata[, intersect(colnames(RACdata), colnames(nodESfit))]
+
+#RACs for whole genomes
 bactambRAC <- unlist(RACdata[1,])
 bactfertRAC <- unlist(RACdata[2,])
 nodambRAC <- unlist(RACdata[3,])
@@ -267,6 +305,34 @@ RAC_Nmetab_bactfert <- RAC(Nmetab_bactfertRAC)
 RAC_Nmetab_nodamb <- RAC(Nmetab_nodambRAC)
 RAC_Nmetab_nodfert <- RAC(Nmetab_nodfertRAC)
 RAC_Nmetab_t0 <- RAC(Nmetab_t0RAC)
+
+#RACs for nodulation ES and NE genes
+
+#NE
+nodNE_bactambRAC <- unlist(RACdata_nodNE[1,])
+nodNE_bactfertRAC <- unlist(RACdata_nodNE[2,])
+nodNE_nodambRAC <- unlist(RACdata_nodNE[3,])
+nodNE_nodfertRAC <- unlist(RACdata_nodNE[4,])
+nodNE_t0RAC <- unlist(RACdata_nodNE[5,])
+
+RAC_nodNE_bactamb <- RAC(nodNE_bactambRAC)
+RAC_nodNE_bactfert <- RAC(nodNE_bactfertRAC)
+RAC_nodNE_nodamb <- RAC(nodNE_nodambRAC)
+RAC_nodNE_nodfert <- RAC(nodNE_nodfertRAC)
+RAC_nodNE_t0 <- RAC(nodNE_t0RAC)
+
+#ES
+nodES_bactambRAC <- unlist(RACdata_nodES[1,])
+nodES_bactfertRAC <- unlist(RACdata_nodES[2,])
+nodES_nodambRAC <- unlist(RACdata_nodES[3,])
+nodES_nodfertRAC <- unlist(RACdata_nodES[4,])
+nodES_t0RAC <- unlist(RACdata_nodES[5,])
+
+RAC_nodES_bactamb <- RAC(nodES_bactambRAC)
+RAC_nodES_bactfert <- RAC(nodES_bactfertRAC)
+RAC_nodES_nodamb <- RAC(nodES_nodambRAC)
+RAC_nodES_nodfert <- RAC(nodES_nodfertRAC)
+RAC_nodES_t0 <- RAC(nodES_t0RAC)
 
 # rough example plots can be made using Qbio provided code; need to rewrite in ggplot
 
@@ -305,6 +371,18 @@ ks_nodule_Nmetab <- ks.test(RAC_Nmetab_nodamb, RAC_Nmetab_nodfert, exact = TRUE)
 
 ks_amb_compartment_Nmetab <- ks.test(RAC_Nmetab_nodamb, RAC_Nmetab_bactamb, exact = TRUE)
 ks_fert_compartment_Nmetab <- ks.test(RAC_Nmetab_bactfert, RAC_Nmetab_nodfert, exact = TRUE)
+
+#K-S tests for nodulation ES and NE genes
+
+ks_bacteroid_nodNE <- ks.test(RAC_nodNE_bactamb, RAC_nodNE_bactfert, exact = TRUE)
+ks_nodule_nodNE <- ks.test(RAC_nodNE_nodamb, RAC_nodNE_nodfert, exact = TRUE)
+ks_amb_nodNE <- ks.test(RAC_nodNE_nodamb, RAC_nodES_bactamb, exact = TRUE)
+ks_fert_nodNE <- ks.test(RAC_nodNE_nodfert, RAC_nodNE_bactfert, exact = TRUE)
+
+ks_bacteroid_nodES <- ks.test(RAC_nodES_bactamb, RAC_nodES_bactfert, exact = TRUE)
+ks_nodule_nodES <- ks.test(RAC_nodES_nodamb, RAC_nodES_nodfert, exact = TRUE)
+ks_amb_nodES <- ks.test(RAC_nodES_nodamb, RAC_nodES_bactamb, exact = TRUE)
+ks_fert_nodES <- ks.test(RAC_nodES_nodfert, RAC_nodES_bactfert, exact = TRUE)
 
 #ranked fitness analysis conducted using similar methods to the rank-abundance tests
 
@@ -390,69 +468,119 @@ ks_fert_compartment_Nmetab_fit <- ks.test(Nmetab_ranked_bactfert, Nmetab_ranked_
 
 # PCA analysis to ordinate data; WORK IN PROGRESS 
 
-KMO(cor_nodES)
-KMO(cor_nodNE)
-KMO(cor_complete)
-KMO(cor_Nmetabolism)
 
-cortest.bartlett(cor_nodES, n = nrow(cor_nodES))
-cortest.bartlett(cor_nodNE, n = nrow(cor_nodNE))
-cortest.bartlett(cor_complete, n = nrow(cor_complete))
-cortest.bartlett(cor_Nmetabolism, n = nrow(cor_Nmetabolism))
+pca_metadata <- subset(finalperm_metadata, row.names(finalperm_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40"))
 
-pca_nodES <- rda(scaled_nodES, scale = TRUE)
-pca_nodNE <- rda(scaled_nodNE, scale = TRUE)
-pca_complete <- rda(scaled_complete, scale = TRUE) 
-pca_Nmetabolism <- rda(scaled_Nmetabolism, scale = TRUE) #PCA analysis 
+pcalabels <- c("1_nf", "2_nf", "4_nf", "6_na", "7_na", "8_na", "9_na", "10_na", "2_bf", "3_bf", "5_bf", "7_ba", "10_ba")
+
+pca_metadata$newID <- pcalabels
+
+goodrows <- row.names(cor_nodNE)
+goodcols <- colnames(cor_nodNE)
+pca_rows <- goodrows[1:(length(goodrows) - 5)]
+pca_cols <- goodcols[1:(length(goodcols) - 5)] #create filter to remove t0 from PCA dataset
+
+goodcor_nodES <- cor_nodES[pca_rows, pca_cols]
+goodcor_nodNE <- cor_nodNE[pca_rows, pca_cols]
+goodcor_complete <- cor_complete[pca_rows, pca_cols]
+goodcor_Nmetabolism <- cor_Nmetabolism[pca_rows, pca_cols]
+goodscaled_nodES <- scaled_nodES[pca_rows, pca_cols]
+goodscaled_nodNE <- scaled_nodNE[pca_rows, pca_cols]
+goodscaled_complete <- scaled_complete[pca_rows, pca_cols]
+goodscaled_Nmetabolism <- scaled_Nmetabolism[pca_rows, pca_cols] #removes t0 from PCA dataset
+
+row.names(goodscaled_nodES) <- pcalabels
+colnames(goodscaled_nodES) <- pcalabels
+row.names(goodscaled_nodNE) <- pcalabels
+colnames(goodscaled_nodNE) <- pcalabels
+row.names(goodscaled_complete) <- pcalabels
+colnames(goodscaled_complete) <- pcalabels
+row.names(goodscaled_Nmetabolism) <- pcalabels
+colnames(goodscaled_Nmetabolism) <- pcalabels #new pot labels for biplots, etc
+
+
+
+KMO(goodcor_nodES)
+KMO(goodcor_nodNE)
+KMO(goodcor_complete)
+KMO(goodcor_Nmetabolism)
+
+cortest.bartlett(goodcor_nodES, n = nrow(goodcor_nodES))
+cortest.bartlett(goodcor_nodNE, n = nrow(goodcor_nodNE))
+cortest.bartlett(goodcor_complete, n = nrow(goodcor_complete))
+cortest.bartlett(goodcor_Nmetabolism, n = nrow(goodcor_Nmetabolism))
+
+pca_nodES <- rda(goodscaled_nodES, scale = TRUE)
+pca_nodNE <- rda(goodscaled_nodNE, scale = TRUE)
+pca_complete <- rda(goodscaled_complete, scale = TRUE) 
+pca_Nmetabolism <- rda(goodscaled_Nmetabolism, scale = TRUE) #PCA analysis 
+
+biplot(pca_nodES)
+biplot(pca_nodNE)
+biplot(pca_complete)
+biplot(pca_Nmetabolism)
+
+sites_nodES = as.data.frame(scores(pca_nodES, display = "sites"))
+sites_nodNE = as.data.frame(scores(pca_nodNE, display = "sites"))
+sites_complete = as.data.frame(scores(pca_complete, display = "sites"))
+sites_Nmetabolism = as.data.frame(scores(pca_Nmetabolism, display = "sites"))
+
 
 #nice ggplots of the PCA analyses
 
 #nodES
 
+ggplot(sites_nodES,aes(x=PC1,y=PC2,color=pca_metadata$compartment,shape=pca_metadata$Ntreatment)) +
+  geom_point(size=8)+
+  xlab("PC 1") +
+  ylab("PC 2") +
+  theme_bw(base_size = 30) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(size = 1, colour = "black",fill=NA),
+        panel.background = element_rect(fill="white"),
+        axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
+        axis.text.y=element_text(size=rel(0.9)))
+
 #nodNE
 
-#Nmetabolism
+ggplot(sites_nodNE,aes(x=PC1,y=PC2,color=pca_metadata$compartment,shape=pca_metadata$Ntreatment)) +
+  geom_point(size=8)+
+  xlab("PC 1") +
+  ylab("PC 2") +
+  theme_bw(base_size = 30) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(size = 1, colour = "black",fill=NA),
+        panel.background = element_rect(fill="white"),
+        axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
+        axis.text.y=element_text(size=rel(0.9)))
 
 #complete
 
-```
+ggplot(sites_complete,aes(x=PC1,y=PC2,color=pca_metadata$compartment,shape=pca_metadata$Ntreatment)) +
+  geom_point(size=8)+
+  xlab("PC 1") +
+  ylab("PC 2") +
+  theme_bw(base_size = 30) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(size = 1, colour = "black",fill=NA),
+        panel.background = element_rect(fill="white"),
+        axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
+        axis.text.y=element_text(size=rel(0.9)))
 
-```{r}
+#Nmetabolism
 
-# PERMANOVA analyses of each resemblance matrix
-
-permanova_metadata <- metadata
-row.names(permanova_metadata) <- c("X21", "X22", "X23", "X24", "X26", "X27", "X28", "X29", "X3X", "X31", "X32", "X33", "X35", "X37", "X39", "X4X", "X41", "X42", "X43", "X44", "X45")
-
-finalperm_metadata <- subset(permanova_metadata, row.names(permanova_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
-
-attr(scaled_nodES, "Site") <- row.names(finalperm_metadata)
-attr(scaled_nodES, "Ntreatment") <- finalperm_metadata$Ntreatment
-attr(scaled_nodES, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
-
-attr(scaled_nodNE, "Site") <- row.names(finalperm_metadata)
-attr(scaled_nodNE, "Ntreatment") <- finalperm_metadata$Ntreatment
-attr(scaled_nodNE, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
-
-attr(scaled_complete, "Site") <- row.names(finalperm_metadata)
-attr(scaled_complete, "Ntreatment") <- finalperm_metadata$Ntreatment
-attr(scaled_complete, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
-
-attr(scaled_Nmetabolism, "Site") <- row.names(finalperm_metadata)
-attr(scaled_Nmetabolism, "Ntreatment") <- finalperm_metadata$Ntreatment
-attr(scaled_Nmetabolism, "Compartment") <- finalperm_metadata$compartment #adds metadata to scaled matrix as attributes
-
-adonis2(Site ~ Ntreatment/Compartment, data = scaled_nodES)
-
-adonis2(Site ~ Ntreatment/Compartment, data = scaled_nodNE)
-
-adonis2(Site ~ Ntreatment/Compartment, data = scaled_complete)
-
-adonis2(Site ~ Ntreatment/Compartment, data = scaled_Nmetabolism)
-
+ggplot(sites_Nmetabolism,aes(x=PC1,y=PC2,color=pca_metadata$compartment,shape=pca_metadata$Ntreatment)) +
+  geom_point(size=8)+
+  xlab("PC 1") +
+  ylab("PC 2") +
+  theme_bw(base_size = 30) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(size = 1, colour = "black",fill=NA),
+        panel.background = element_rect(fill="white"),
+        axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
+        axis.text.y=element_text(size=rel(0.9)))
 
 ```
-
 
 ```{r}
 
