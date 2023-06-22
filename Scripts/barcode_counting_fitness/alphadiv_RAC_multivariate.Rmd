@@ -51,6 +51,7 @@ library(tidyr)
 library(reshape2)
 library(tibble)
 library(ggdendro)
+library(fgsea)
 require("psych")
 
 ```
@@ -929,6 +930,94 @@ for (i in seq_along(COGtables)) {
   
   assign(df_name, merged_df, envir = globalenv())
 } #tabulates contingency data for each COG table
+
+
+#next step: pull locus ids from each COG_X df into vectors to be fed into a pathways.gmt file for fgsea analysis
+
+genesetsCOG <- lapply(seq_along(COGlist), function(i) {
+  df <- COGlist[[i]]
+  first_col <- as.character(df[[1]])
+  vector_name <- paste0("set", unique(df[[4]]))
+  names(first_col) <- NULL
+  names <- setNames(list(first_col), vector_name)
+  return(names)
+})#rearranges COG information into a list of vectors to be fed into fgsea functions to build pathways file
+
+genesetsCOG <- unlist(genesetsCOG, recursive = FALSE) #final format
+
+#then, pipe the list into writeGmtPathways(); declare pathways <- Gmtpathways(written)
+
+writeGmtPathways(genesetsCOG, tempfile("COGsets", fileext = ".gmt")) #creates file in temp dir which must be manually retrieved, also includes like a hexadecimal id (or maybe it's just random numbers and letters?) which I deleted
+pathways <- gmtPathways("COGsets.gmt") #I added this renamed file to my R working directory
+
+tlike_data <- read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/fit_t.tab")
+#tlike_data <- read.delim(~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_t.tab")
+tlike_data <- tlike_data[, -c(2:3)] #removes redundant col and description
+tlike_data <- tlike_data[, -c(18:22)] #removes t0
+
+tlike_col_ranges <- list(
+  nodN = c(2:5),
+  nodamb = c(6:10),
+  bactN = c(11:14),
+  bactamb = c(15:17)
+)
+
+tlike_data_meaned <- data.frame(ID = tlike_data$locusId)
+
+
+for (i in 1:nrow(tlike_data)) {
+  new_values <- numeric(length(tlike_col_ranges))
+  for (j in seq_along(tlike_col_ranges)) {
+    cols <- tlike_col_ranges[[j]]
+    numeric_cols <- cols[sapply(tlike_data[, cols], is.numeric)]
+    numeric_values <- as.numeric(tlike_data[i, numeric_cols])
+    numeric_values <- numeric_values[!is.na(numeric_values)]
+    if (length(numeric_values) > 0) {
+      new_values[j] <- mean(numeric_values)
+    }
+  }
+  tlike_data_meaned[i, names(tlike_col_ranges)] <- new_values
+}
+
+print(tlike_data_meaned)
+row.names(tlike_data_meaned) <- tlike_data_meaned[, 1]
+tlike_data_meaned <- tlike_data_meaned[, -c(1)]
+
+tlike_meaned_nodN <- unlist(tlike_data_meaned[,1])
+tlike_meaned_nodamb <- unlist(tlike_data_meaned[,2])
+tlike_meaned_bactN <- unlist(tlike_data_meaned[,3])
+tlike_meaned_bactamb <- unlist(tlike_data_meaned[,4])
+
+names(tlike_meaned_nodN) <- rownames(tlike_data_meaned)
+names(tlike_meaned_nodamb) <- rownames(tlike_data_meaned)
+names(tlike_meaned_bactN) <- rownames(tlike_data_meaned)
+names(tlike_meaned_bactamb) <- rownames(tlike_data_meaned)
+
+tlike_nodN_ranked <- rankfit(tlike_meaned_nodN)
+tlike_nodamb_ranked <- rankfit(tlike_meaned_nodamb)
+tlike_bactN_ranked <- rankfit(tlike_meaned_bactN)
+tlike_bactamb_ranked <- rankfit(tlike_meaned_bactamb)
+
+tlike_nodN_ranked <- tlike_nodN_ranked[order(-tlike_nodN_ranked$x),,drop=FALSE]
+tlike_nodamb_ranked <- tlike_nodamb_ranked[order(-tlike_nodamb_ranked$x),,drop=FALSE]
+tlike_bactN_ranked <- tlike_bactN_ranked[order(-tlike_bactN_ranked$x),,drop=FALSE]
+tlike_bactamb_ranked <- tlike_bactamb_ranked[order(-tlike_bactamb_ranked$x),,drop=FALSE]
+
+write.table(tlike_nodN_ranked, file = "C:/Users/User/Desktop/nodN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+write.table(tlike_nodamb_ranked, file = "C:/Users/User/Desktop/nodamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+write.table(tlike_bactN_ranked, file = "C:/Users/User/Desktop/bactN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+write.table(tlike_bactamb_ranked, file = "C:/Users/User/Desktop/bactamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+
+nodNranks <- read.table("C:/Users/User/Desktop/nodN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+nodambranks <- read.table("C:/Users/User/Desktop/nodamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+bactNranks <- read.table("C:/Users/User/Desktop/bactN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+bactambranks <- read.table("C:/Users/User/Desktop/bactamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+#nodNranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/nodN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+#nodambranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/nodamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+#bactNranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/bactN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+#bactambranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/bactamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+
+#then, run geseca() and fgsea()
 
 ```
 
