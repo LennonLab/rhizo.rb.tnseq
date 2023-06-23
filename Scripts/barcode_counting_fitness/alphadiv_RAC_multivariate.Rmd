@@ -846,7 +846,7 @@ Nmetab_covar_permanova
 
 #subset dataframes by COG category for downstream analyses
 
-COGcomplete_conting <- COGcomplete #made a copy of the df so i could work with it without destroying it lol
+COGcomplete_conting <- COGcomplete #made a copy of the df so i could work with it without destroying it
 
 numeric_cols <- which(sapply(COGcomplete_conting, is.numeric)) #creates separate df extracting numeric data from character metadata
 
@@ -960,64 +960,84 @@ tlike_col_ranges <- list(
   nodamb = c(6:10),
   bactN = c(11:14),
   bactamb = c(15:17)
-)
+) #defines ranges of columns containing data for each treatment/compartment combination to be averaged together
 
-tlike_data_meaned <- data.frame(ID = tlike_data$locusId)
+tlike_data_meaned <- data.frame(ID = tlike_data$locusId) #creates df to be populated by meaned t-like data
 
 
 for (i in 1:nrow(tlike_data)) {
-  new_values <- numeric(length(tlike_col_ranges))
+  new_values <- numeric(length(tlike_col_ranges))  #goes through each row of tlike_data and creates new df of the proper length with the same rows as the parent
   for (j in seq_along(tlike_col_ranges)) {
-    cols <- tlike_col_ranges[[j]]
-    numeric_cols <- cols[sapply(tlike_data[, cols], is.numeric)]
-    numeric_values <- as.numeric(tlike_data[i, numeric_cols])
+    cols <- tlike_col_ranges[[j]] 
+    numeric_cols <- cols[sapply(tlike_data[, cols], is.numeric)] #obtains column group, checks for numeric
+    numeric_values <- as.numeric(tlike_data[i, numeric_cols]) 
     numeric_values <- numeric_values[!is.na(numeric_values)]
     if (length(numeric_values) > 0) {
-      new_values[j] <- mean(numeric_values)
+      new_values[j] <- mean(numeric_values) #if the values are numeric and no NAs, then calc mean and store values
     }
   }
-  tlike_data_meaned[i, names(tlike_col_ranges)] <- new_values
+  tlike_data_meaned[i, names(tlike_col_ranges)] <- new_values #new values are assigned to the correct rows in new df
 }
 
-print(tlike_data_meaned)
+print(tlike_data_meaned) #make sure it looks right
 row.names(tlike_data_meaned) <- tlike_data_meaned[, 1]
-tlike_data_meaned <- tlike_data_meaned[, -c(1)]
+tlike_data_meaned <- tlike_data_meaned[, -c(1)] #clean up extra row containing row names
 
 tlike_meaned_nodN <- unlist(tlike_data_meaned[,1])
 tlike_meaned_nodamb <- unlist(tlike_data_meaned[,2])
 tlike_meaned_bactN <- unlist(tlike_data_meaned[,3])
-tlike_meaned_bactamb <- unlist(tlike_data_meaned[,4])
+tlike_meaned_bactamb <- unlist(tlike_data_meaned[,4]) #due to difficulties with variable typing, the object must be unlisted into four separate objects, renamed, ranked, re-sorted, written to a .rnk file, read back into the environment as such, then converted and renamed again, before being fed into fgsea. Many of these steps are likely redundant; will be cleaned up later
 
 names(tlike_meaned_nodN) <- rownames(tlike_data_meaned)
 names(tlike_meaned_nodamb) <- rownames(tlike_data_meaned)
 names(tlike_meaned_bactN) <- rownames(tlike_data_meaned)
-names(tlike_meaned_bactamb) <- rownames(tlike_data_meaned)
+names(tlike_meaned_bactamb) <- rownames(tlike_data_meaned) 
 
 tlike_nodN_ranked <- rankfit(tlike_meaned_nodN)
 tlike_nodamb_ranked <- rankfit(tlike_meaned_nodamb)
 tlike_bactN_ranked <- rankfit(tlike_meaned_bactN)
-tlike_bactamb_ranked <- rankfit(tlike_meaned_bactamb)
+tlike_bactamb_ranked <- rankfit(tlike_meaned_bactamb) #rank from greatest to least
 
 tlike_nodN_ranked <- tlike_nodN_ranked[order(-tlike_nodN_ranked$x),,drop=FALSE]
 tlike_nodamb_ranked <- tlike_nodamb_ranked[order(-tlike_nodamb_ranked$x),,drop=FALSE]
 tlike_bactN_ranked <- tlike_bactN_ranked[order(-tlike_bactN_ranked$x),,drop=FALSE]
-tlike_bactamb_ranked <- tlike_bactamb_ranked[order(-tlike_bactamb_ranked$x),,drop=FALSE]
+tlike_bactamb_ranked <- tlike_bactamb_ranked[order(-tlike_bactamb_ranked$x),,drop=FALSE] #sorts ranks by # rather than gene name
 
-write.table(tlike_nodN_ranked, file = "C:/Users/User/Desktop/nodN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
-write.table(tlike_nodamb_ranked, file = "C:/Users/User/Desktop/nodamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
-write.table(tlike_bactN_ranked, file = "C:/Users/User/Desktop/bactN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
-write.table(tlike_bactamb_ranked, file = "C:/Users/User/Desktop/bactamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+# write.table(tlike_nodN_ranked, file = "C:/Users/User/Desktop/nodN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+# write.table(tlike_nodamb_ranked, file = "C:/Users/User/Desktop/nodamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+# write.table(tlike_bactN_ranked, file = "C:/Users/User/Desktop/bactN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
+# write.table(tlike_bactamb_ranked, file = "C:/Users/User/Desktop/bactamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE) #creates tab-delimited .rnk files for gene set enrichment analysis
 
 nodNranks <- read.table("C:/Users/User/Desktop/nodN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
 nodambranks <- read.table("C:/Users/User/Desktop/nodamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
 bactNranks <- read.table("C:/Users/User/Desktop/bactN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
-bactambranks <- read.table("C:/Users/User/Desktop/bactamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+bactambranks <- read.table("C:/Users/User/Desktop/bactamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric")) #reads .rnk files back in as ranks
 #nodNranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/nodN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
 #nodambranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/nodamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
 #bactNranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/bactN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
-#bactambranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/bactamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
+#bactambranks <- read.table("/home/chill37/Github/rhizo.rb.tnseq/Scripts/gsea_geseca/bactamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric")) 
+
+nodN_ranks <- as.numeric(unlist(nodNranks$x))
+names(nodN_ranks) <- rownames(nodNranks)
+nodamb_ranks <- as.numeric(unlist(nodambranks$x))
+names(nodamb_ranks) <- rownames(nodambranks)
+bactN_ranks <- as.numeric(unlist(bactNranks$x))
+names(bactN_ranks) <- rownames(bactNranks)
+bactamb_ranks <- as.numeric(unlist(bactambranks$x))
+names(bactamb_ranks) <- rownames(bactambranks) #final retype and rename for fgsea
 
 #then, run geseca() and fgsea()
+
+fgsea_nodN <- fgsea(pathways, nodN_ranks, minSize = 1, maxSize = 1100)
+fgsea_nodamb <- fgsea(pathways, nodamb_ranks, minSize = 1, maxSize = 1100)
+fgsea_bactN <- fgsea(pathways, bactN_ranks, minSize = 1, maxSize = 1100)
+fgsea_bactamb <- fgsea(pathways, bactamb_ranks, minSize = 1, maxSize = 1100)
+
+geseca_data <- tlike_data
+rownames(geseca_data) <- geseca_data$locusId
+geseca_data <- geseca_data[, -c(1)]
+
+geseca_rbtnseq <- geseca(pathways, geseca_data, minSize = 1, maxSize = 1100)
 
 ```
 
