@@ -8,12 +8,12 @@ editor_options:
 
 fitdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/fit_logratios_clean.tab", row.names = 1)
 #fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
-goodfitdat <- fitdat[, c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45")]
+goodfitdat <- fitdat[, c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45")]
 #FITNESS SCORE data--negative log2 ratios of endpoint/starting counts
 
 cleanrbdat = t(read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
 #cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
-goodcountdat <- subset(cleanrbdat, colnames(fitdat) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
+goodcountdat <- subset(cleanrbdat, colnames(fitdat) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
 #COUNTS DATA for analyses that can't use log ratio data for whatever reason (negative numbers in data, log scale, etc)
 
 newcountnames <- substr(colnames(goodcountdat), 0, 9)
@@ -28,19 +28,19 @@ cleanrbdat <- as.data.frame(cleanrbdat)
 
 rownames(cleanrbdat) <- cleanrbdat$comb
 cleanrbdat = t(cleanrbdat[,-c(1:4)])
-metadata = as.data.frame(matrix(ncol=2,nrow=21))
-metadata[,1] <-c(rep("nod",9),rep("bact",7),rep("start",5))
-metadata[,2] <-c(rep("fertilized",4),rep("ambient",5),rep("fertilized",4),rep("ambient",3),rep("time0",5))
+metadata = as.data.frame(matrix(ncol=2,nrow=19))
+metadata[,1] <-c(rep("nod",9),rep("bact",5),rep("start",5))
+metadata[,2] <-c(rep("fertilized",4),rep("ambient",5),rep("fertilized",3),rep("ambient",2),rep("time0",5))
 colnames(metadata) <- c("compartment","Ntreatment")  #this cleans up and labels data by treatment/compartment
 
 labeled_metadata <- metadata
-row.names(labeled_metadata) <- c("X21", "X22", "X23", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X33", "X35", "X37", "X39", "X40", "X41", "X42", "X43", "X44", "X45") #adds numerical IDs to metadata df
+row.names(labeled_metadata) <- c("X21", "X22", "X23", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45") #adds numerical IDs to metadata df
 
-goodqual_metadata <- subset(labeled_metadata, row.names(labeled_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
-potlabels <- c("1_nf", "2_nf", "4_nf", "6_na", "7_na", "8_na", "9_na", "10_na", "2_bf", "3_bf", "5_bf", "7_ba", "10_ba", "t0_1", "t0_2", "t0_3", "t0_4", "t0_5") 
+goodqual_metadata <- subset(labeled_metadata, row.names(labeled_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
+potlabels <- c("1", "2", "4", "6", "7", "8", "9", "10", "1", "2", "5", "7", "10", "t0", "t0", "t0", "t0", "t0") 
 goodqual_metadata$newID <- potlabels #adds abbreviated treatment/compartment id to the pot numbers
 
-finalmetadata <- subset(goodqual_metadata, row.names(goodqual_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X32", "X33", "X35", "X37", "X40")) #filters out t0
+finalmetadata <- subset(goodqual_metadata, row.names(goodqual_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40")) #filters out t0
 
 library(vegan)
 library(ggplot2)
@@ -95,7 +95,7 @@ richnessfit <-  S_obs(goodcountdat)
 richnessfit #SPECIES (ie, gene/deletion mutant) RICHNESS
 
 alphadiversitylib = as.data.frame(matrix(ncol=4,nrow=nrow(goodcountdat)))
-colnames(alphadiversitylib) <- c('Shannon diversity','Evenness (SW)','% Found','Richness')
+colnames(alphadiversitylib) <- c('Shannon','SW_Evenness','percentFound','Richness')
 rownames(alphadiversitylib) <- rownames(goodcountdat)
 alphadiversitylib[,1] <- shannonfit
 alphadiversitylib[,2] <- Evarfit
@@ -103,13 +103,45 @@ alphadiversitylib[,3] <- percentfoundfit
 alphadiversitylib[,4] <- richnessfit
 alphadiversitylib #final collated dataframe of alpha diversity measures by pot
 
+alphadivnames <- c("21 Nod +N", "22 Nod +N", "24 Nod +N", "26 Nod -N", "27 Nod -N", "28 Nod -N", "29 Nod -N", "30 Nod -N", "31 Bact +N", "32 Bact +N", "35 Bact +N", "37 Bact -N", "40 Bact -N", "t0 1", "t0 2", "t0 3", "t0 4", "t0 5")
+
+rownames(alphadiversitylib) <- alphadivnames
+
+#Statistical analysis of alphadiv data
+
+alphadiversitylib$group <- c("nodN", "nodN", "nodN", "nodamb", "nodamb", "nodamb", "nodamb", "nodamb", "bactN", "bactN", "bactN", "bactamb", "bactamb", "t0", "t0", "t0", "t0", "t0")
+
+alphadiv_anova_data <- alphadiversitylib %>%
+  group_by(group) %>%
+  summarize(Mean_Shannon = mean(Shannon),
+    SE_Shannon = sd(Shannon) / sqrt(n()),
+    Mean_SWEvenness = mean(SW_Evenness),
+    SE_Evenness = sd(SW_Evenness) / sqrt(n()),
+    Mean_percentFound = mean(percentFound),
+    SE_percentFound = sd(percentFound) / sqrt(n()),
+    Mean_Richness = mean(Richness),
+    SE_Richness = sd(Richness) / sqrt(n())
+  ) #grouped and meaned for anova, and also for reporting mean and SE
+
+alpha_anova_shannon <- aov(Shannon ~ group, data = alphadiversitylib)
+alpha_anova_SWevenness <- aov(SW_Evenness ~ group, data = alphadiversitylib)
+alpha_anova_percentfound <- aov(percentFound ~ group, data = alphadiversitylib)
+alpha_anova_richness <- aov(Richness ~ group, data = alphadiversitylib)
+
+alphadiv_onlyresponse <- head(alphadiversitylib, -5)
+
+alpha_anova_shannon_exp <- aov(Shannon ~ group, data = alphadiv_onlyresponse)
+alpha_anova_SWevenness_exp <- aov(SW_Evenness ~ group, data = alphadiv_onlyresponse)
+alpha_anova_percentfound_exp <- aov(percentFound ~ group, data = alphadiv_onlyresponse)
+alpha_anova_richness_exp <- aov(Richness ~ group, data = alphadiv_onlyresponse)
+
 ```
 
 ```{r Chunk 3: Resemblance matrices}
 
 fitmetadata <- read.csv("C:/Users/User/Desktop/analyze_Nfitness/smeliplant_neutral_cog_clean.csv")
 #fitmetadata <- read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral_cog_clean.csv")
-#metadata describing genes in detail--locus id, name, cog category, description, essentiality for nodulation, etc etc
+#metadata describing genes in detail--locus id, name, cog category, description, essentiality for nodulation, etc etc. 
 
 fitmetadata <- fitmetadata[, -c(1)] #clean up empty column
 
@@ -147,6 +179,11 @@ COGnodNE <- nodNEfit
 COGcomplete <- completefit
 COGNmetabolism <- Nmetabolismfit #saves a version of the matrices which preserves metadata to be subsetted by COG in later analyses
 
+KEGGnodES <- nodESfit
+KEGGnodNE <- nodNEfit
+KEGGcomplete <- completefit
+KEGGNmetabolism <- Nmetabolismfit #KEGG df clones to preserve metadata for later
+
 nodESfit <- nodESfit[, -c(2:18)]
 nodNEfit <- nodNEfit[, -c(2:18)]
 completefit <- completefit[, -c(2:18)]
@@ -174,7 +211,7 @@ row.names(Nmetabolismfit) <- potlabels #relabel pots to include pot number and t
 dissim_nodES <- vegdist(nodESfit, method = "euclid", diag = FALSE)
 dissim_nodNE <- vegdist(nodNEfit, method = "euclid", diag = FALSE)
 dissim_complete <- vegdist(completefit, method = "euclid", diag = FALSE)
-dissim_Nmetabolism <- vegdist(Nmetabolismfit, method = "euclid", diag = FALSE) #resemblance matrices; still experimenting with different dissimilarity indices. Fitness data is log ratio data so it's kind of weird; might need to design one
+dissim_Nmetabolism <- vegdist(Nmetabolismfit, method = "euclid", diag = FALSE) #resemblance matrices; still experimenting with different dissimilarity indices. Fitness data is log ratio data so it's kind of weird
 
 scaled_nodES <- scale(nodESfit)
 scaled_nodNE <- scale(nodNEfit)
@@ -203,7 +240,13 @@ complete_permanova <- adonis2(finalscaled_complete ~ finalmetadata$Ntreatment, d
 
 Nmetabolism_permanova <- adonis2(finalscaled_Nmetabolism ~ finalmetadata$Ntreatment, data = finalscaled_Nmetabolism, permutations = 9999,  method="euclidean")
 
-#need to think about the architecture of this a little more--ideally, we would stratify by pot, but this isn't feasible with the bacteroid and nodule data split across the pots like this (nodule data from pots 1, 2, 4, 6, 7, 8, 9, 10; bacteroid data from pots 2, 3, 5, 7, 10)
+permanova_pvals <- c(nodES_permanova$`Pr(>F)`, nodNE_permanova$`Pr(>F)`)
+
+permanova_pvals <- na.omit(permanova_pvals)
+
+adjusted_permanova_pvals <- p.adjust(permanova_pvals, method = "fdr")
+
+#need to think about the architecture of this a little more--ideally, we would stratify by pot, but this isn't feasible with the bacteroid and nodule data split across the pots like this (nodule data from pots 1, 2, 4, 6, 7, 8, 9, 10; bacteroid data from pots 2, 3, 5, 7, 9, 10)
 ```
 
 ```{r Chunk 5: Ward's clustering}
@@ -219,7 +262,7 @@ ward_Nmetabolism <- hclust(dissim_Nmetabolism, method = "ward.D2")
 wardlabels <- paste(goodqual_metadata$compartment, goodqual_metadata$Ntreatment, sep = "_")
 wardlabels <- as.data.frame(wardlabels)
 row.names(wardlabels) <- row.names(goodqual_metadata)
-wardlabels$potID <- c("1_", "2_", "4_", "6_", "7_", "8_", "9_", "10_", "2_", "3_", "5_", "7_", "10_", "1_", "2_", "3_", "4_", "5_")
+wardlabels$potID <- c("1_", "2_", "4_", "6_", "7_", "8_", "9_", "10_", "1_", "2_",  "5_", "7_", "10_", "1_", "2_", "3_", "4_", "5_")
 wardlabels <- paste(wardlabels$potID, wardlabels$wardlabels, sep = "")
 
 par(mar = c(1, 5, 2, 2) + 0.1)
@@ -241,9 +284,9 @@ RAC <- function(x = ""){
 } #returns a rank-abundance dataset for a given site to be plotted
 
 RACmetadata <- metadata
-row.names(RACmetadata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040", "041", "042", "043", "044", "045")
-RACmetadata <- subset(RACmetadata, row.names(RACmetadata) %in% c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045"))
-row.names(goodcountdat) <- c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045")
+row.names(RACmetadata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "035", "037", "040", "041", "042", "043", "044", "045")
+RACmetadata <- subset(RACmetadata, row.names(RACmetadata) %in% c("021", "022", "024", "026", "027", "028", "029", "030", "031", "032", "035", "037", "040", "041", "042", "043", "044", "045"))
+row.names(goodcountdat) <- c("021", "022", "024", "026", "027", "028", "029", "030", "031",  "032", "035", "037", "040", "041", "042", "043", "044", "045")
 #above block sets up row names and such to be merged and unmerged
 
 RACsubsetter <- as.data.frame(cbind(goodcountdat, RACmetadata))
@@ -427,7 +470,7 @@ rankfit <- function(x) {
 } #version of the RAC function designed to rank fitness scores, which have negative and positive values
  
 rankfitdata <- t(goodfitdat)
-row.names(rankfitdata) <- c("021", "022", "024", "026", "027", "028", "029", "030", "032", "033", "035", "037", "040", "041", "042", "043", "044", "045")
+row.names(rankfitdata) <- c("021", "022", "024", "026", "027", "028", "029", "030", "031", "032", "035", "037", "040", "041", "042", "043", "044", "045")
 rankfitdata <- cbind(RACsubsetter$group, rankfitdata)
 rankfitdata <- as.data.frame(rankfitdata)
 rankfitdata <- rankfitdata %>%
@@ -583,11 +626,11 @@ ks_fert_nodES_fit <- ks.test(ks_ranked_nodES_nodfert, ks_ranked_nodES_bactfert, 
 #combined RAC-like fitness ranking plots per dataset
 
 #ES
-finalfitrank_nodES <- as.data.frame(rbind(as.numeric(ks_ranked_nodES_bactamb), as.numeric(ks_ranked_nodES_bactfert), as.numeric(ks_ranked_nodES_nodamb), as.numeric(ks_ranked_nodES_nodfert), as.numeric(ks_ranked_nodES_t0)))
+finalfitrank_nodES <- as.data.frame(rbind(as.numeric(ks_ranked_nodES_bactamb), as.numeric(ks_ranked_nodES_bactfert), as.numeric(ks_ranked_nodES_nodamb), as.numeric(ks_ranked_nodES_nodfert), as.numeric(ks_ranked_nodES_t0))) #combine rankings to be plotted together
 colnames(finalfitrank_nodES) <- 1:2756
 finalfitrank_nodES$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
 
-finalfitrank_nodES <- pivot_longer(finalfitrank_nodES, cols = colnames(finalfitrank_nodES)[1:2756])
+finalfitrank_nodES <- pivot_longer(finalfitrank_nodES, cols = colnames(finalfitrank_nodES)[1:2756]) #flips df for plotting purposes
 
 combinedfitrank_nodES <- ggplot(finalfitrank_nodES, aes(x = as.numeric(as.character(name)), y = log10(value), group = treatment, color = treatment, fill = treatment)) +
   geom_line() +
@@ -635,16 +678,36 @@ combinedfitrank_Nmetab <- ggplot(finalfitrank_Nmetab, aes(x = as.numeric(as.char
 combinedfitrank_Nmetab
 
 
+#False discovery rate adjustments
+
+ks_objects <- ls(pattern = "^ks_", envir = .GlobalEnv)
+ks_test_objects <- character(0)
+
+for (obj in ks_objects) {
+  if (typeof(get(obj)) == "list") {
+    ks_test_objects <- c(ks_test_objects, obj)
+  }
+} #some objects named "ks_" are not k-s tests, but all true k-s tests are "list" type objects, so this loop goes through the ks_objects and picks only the ones that are lists, ie actual k-s tests
+
+p_values <- numeric(length(ks_test_objects)) #make a landing zone for the pvals and IDs that's as long as the input df
+for (i in seq_along(ks_test_objects)) {
+  p_values[i] <- get(ks_test_objects[i])$p.value
+} #for each item in the sequence within ks_test_objects, add a value to p_values which is from that index's entry in ks_test_objects and is called [entry]$p.value
+
+names(p_values) <- gsub("^ks_", "", ks_test_objects) #name them according to the test they came from
+
+adjusted_pvals_ks <- p.adjust(p_values, method = "fdr") #run the FDR and store results
+
 ```
 
 ```{r Chunk 8: Principal component analysis + plots}
 
 #WORK IN PROGRESS
 
-KMO(cor_nodES)
-KMO(cor_nodNE)
-KMO(cor_complete)
-KMO(cor_Nmetabolism)
+# KMO(cor_nodES)
+# KMO(cor_nodNE)
+# KMO(cor_complete)
+# KMO(cor_Nmetabolism)
 
 cortest.bartlett(cor_nodES, n = nrow(cor_nodES))
 cortest.bartlett(cor_nodNE, n = nrow(cor_nodNE))
@@ -745,7 +808,8 @@ pca_covar_nodNE <- prcomp(covar_nodNE, scale = FALSE)
 pca_covar_complete <- prcomp(covar_complete, scale = FALSE)
 pca_covar_Nmetab <- prcomp(covar_Nmetab, scale = FALSE)
 
-biplot(pca_covar_nodES)
+plot(pca_covar_nodES$x)
+text(pca_covar_nodES$x, labels=rownames(pca_covar_nodES$x))
 biplot(pca_covar_nodNE)
 biplot(pca_covar_complete)
 biplot(pca_covar_Nmetab)
@@ -823,13 +887,13 @@ ggplot(covar_scores_Nmetab,aes(x=PC1,y=PC2, color = finalmetadata$Ntreatment, sh
 
 #unscaled PERMANOVA
 
-nodES_covar_permanova <- adonis2(covar_nodES ~ finalmetadata$Ntreatment, data = covar_nodES, permutations = 9999, method="euclidean")
+nodES_covar_permanova <- adonis2(covar_nodES ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_nodES, permutations = 9999, method="euclidean")
 
-nodNE_covar_permanova <- adonis2(covar_nodNE ~ finalmetadata$Ntreatment, data = covar_nodNE, permutations = 9999, method="euclidean")
+nodNE_covar_permanova <- adonis2(covar_nodNE ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_nodNE, permutations = 9999, method="euclidean")
 
-complete_covar_permanova <- adonis2(covar_complete ~ finalmetadata$Ntreatment, data = covar_complete, permutations = 9999, method="euclidean")
+complete_covar_permanova <- adonis2(covar_complete ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_complete, permutations = 9999, method="euclidean")
 
-Nmetab_covar_permanova <- adonis2(covar_Nmetab ~ finalmetadata$Ntreatment, data = covar_Nmetab, permutations = 9999,  method="euclidean")
+Nmetab_covar_permanova <- adonis2(covar_Nmetab ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_Nmetab, permutations = 9999,  method="euclidean")
 
 nodES_covar_permanova
 
@@ -839,43 +903,65 @@ complete_covar_permanova
 
 Nmetab_covar_permanova
 
+covar_permanova_pvals <- c(nodES_covar_permanova$`Pr(>F)`, nodNE_covar_permanova$`Pr(>F)`)
+
+covar_permanova_pvals <- na.omit(covar_permanova_pvals)
+
+adjusted_covarpermanova_pvals <- p.adjust(covar_permanova_pvals, method = "fdr")
+
 ```
 
 
 ``` {r Chunk 11: COG analyses}
 
-#subset dataframes by COG category for downstream analyses
+#SUBSET DATA BY COG FOR DOWNSTREAM ANALYSES
 
 COGcomplete_conting <- COGcomplete #made a copy of the df so i could work with it without destroying it
 
-numeric_cols <- which(sapply(COGcomplete_conting, is.numeric)) #creates separate df extracting numeric data from character metadata
+COGnumeric_cols <- which(sapply(COGcomplete_conting, is.numeric)) #creates separate df extracting numeric data from character metadata by applying is.numeric to each element and selecting which() objects pass the test (ie evaluate to TRUE)
 
-for (col in numeric_cols) {
+for (col in COGnumeric_cols) {
   COGcomplete_conting[[col]] <- ifelse(COGcomplete_conting[[col]] <= -1, -1,
                                        ifelse(COGcomplete_conting[[col]] >= 1, 1, 0))
-} #preps data for contingency tables by replacing low fitness values w -1, high ones w 1, neutral w 0
+} #preps data for contingency tables by replacing low fitness values w -1, high ones w 1, neutral w 0; modifies COGcomplete_conting
 
 COGmatrices <- COGcomplete_conting %>%
   mutate(COGlist = strsplit(COG, "")) %>%
   unnest(COGlist) %>%
   mutate(COG = trimws(COGlist)) #expands rows with multiple COGs to create duplicate rows, so that genes get listed under all their COGs
 
-COGlist <- lapply(unique(COGmatrices$COG), function(currCOG) {
-  COG_X <- COGmatrices %>%
+COGmatrices_nodES <- subset(COGmatrices, COGmatrices$essentiality == "essential")
+COGmatrices_nodNE <- subset(COGmatrices, COGmatrices$essentiality == "N") #subset data by essentiality for symbiosis
+
+COGlist_nodES <- lapply(unique(COGmatrices_nodES$COG), function(currCOG) {
+  COG_X_ES <- COGmatrices_nodES %>%
     filter(COG == currCOG)
   
-  return(COG_X)
-}) # split COG_matrices into separate dataframes based on COG
+  return(COG_X_ES)
+})
+
+COGlist_nodNE <- lapply(unique(COGmatrices_nodNE$COG), function(currCOG) {
+  COG_X_NE <- COGmatrices_nodNE %>%
+    filter(COG == currCOG)
+  
+  return(COG_X_NE)
+}) #split COG_matrices into separate dataframes based on COG and symbiotic function
    #this function and the following were written with the help of ChatGPT to fix the function(curr_cog) syntax as well as the assign() function in the following for loop
 
-for (i in seq_along(COGlist)) {
-  currCOG <- unique(COGlist[[i]]$COG)
-  assign(paste0("COG_", currCOG), COGlist[[i]])
-} # Unlists dfs into separate objects with names COG_X
+for (i in seq_along(COGlist_nodES)) {
+  currCOG <- unique(COGlist_nodES[[i]]$COG)
+  assign(paste0("COG_", currCOG, "_ES"), COGlist_nodES[[i]])
+}
+
+for (i in seq_along(COGlist_nodNE)) {
+  currCOG <- unique(COGlist_nodNE[[i]]$COG)
+  assign(paste0("COG_", currCOG, "_NE"), COGlist_nodNE[[i]])
+}
+ # Unlists dfs into separate objects with names COG_X_[gene set]
 
 
+#MAKE CONTINGENCY TABLES
 
-#creates contingency tables categorizing genes in each COG category
 
 COGnames <- ls(pattern = "^COG_")
 
@@ -883,8 +969,7 @@ for (df_name in COGnames) {
   df <- get(df_name)
   df <- df[, 1:31]
   assign(df_name, df, envir = globalenv())
-}
-#removes the extraneous "COGlist" col left in as an artifact of subsetting, as well as the t0 columns
+} #removes the extraneous "COGlist" col left in as an artifact of subsetting, as well as the t0 columns
 
 contingency_tables <- list() #creates empty list to store conting tables 
 
@@ -913,8 +998,7 @@ for (name in names(contingency_tables)) {
 } #names tables according to the COG they represent
 
 all_dfs <- ls(globalenv())
-COGtables <- grep("^COG_[-A-Z]_table$", ls(), value = TRUE)
-
+COGtables <- grep("^COG_.*_table$", ls(), value = TRUE)
 
 for (i in seq_along(COGtables)) {
   df_name <- COGtables[i]
@@ -927,28 +1011,72 @@ for (i in seq_along(COGtables)) {
     columns <- column_ranges[[j]]
     merged_df[, j] <- rowSums(df[, columns, drop = FALSE])
   }
-  
   assign(df_name, merged_df, envir = globalenv())
 } #tabulates contingency data for each COG table
 
 
-#next step: pull locus ids from each COG_X df into vectors to be fed into a pathways.gmt file for fgsea analysis
 
-genesetsCOG <- lapply(seq_along(COGlist), function(i) {
-  df <- COGlist[[i]]
+#FISHER TESTS
+
+COGtables <- COGtables[! COGtables %in% c('COG_B_NE_table', 'COG_W_ES_table')] #get rid of tables with only 1 gene counted
+
+for (table_name in COGtables) {
+   df <- get(table_name)
+   char_index <- 5
+   result_name <- paste0("fisher_cog", substr(table_name, char_index, char_index), "_", substr(table_name, 7, 8))
+   assign(result_name, fisher.test(df, simulate.p.value = TRUE))
+}
+
+fisher_tests <- ls(pattern = "fisher_cog", envir = .GlobalEnv)
+
+fisher_pvals <- numeric(length(fisher_tests))
+
+for (j in seq_along(fisher_tests)) {
+  fisher_pvals[j] <- get(fisher_tests[j])$p.value
+} 
+
+names(fisher_pvals) <- gsub("^fisher_", "", fisher_tests)
+
+adjusted_fisher_pvals <- p.adjust(fisher_pvals, method = "fdr")
+
+
+#PULL LOCUS IDS FROM EACH COG_X DF INTO VECTORS TO MAKE PATHWAYS.GMT FOR FGSEA
+
+
+genesetsCOG_ES <- lapply(seq_along(COGlist_nodES), function(i) {
+  df <- COGlist_nodES[[i]]
   first_col <- as.character(df[[1]])
   vector_name <- paste0("set", unique(df[[4]]))
   names(first_col) <- NULL
   names <- setNames(list(first_col), vector_name)
   return(names)
-})#rearranges COG information into a list of vectors to be fed into fgsea functions to build pathways file
+}) #rearranges COG information into a list of vectors to be fed into fgsea functions to build pathways file
+genesetsCOG_ES <- unlist(genesetsCOG_ES, recursive = FALSE) #final format
 
-genesetsCOG <- unlist(genesetsCOG, recursive = FALSE) #final format
+genesetsCOG_NE <- lapply(seq_along(COGlist_nodNE), function(i) {
+  df <- COGlist_nodNE[[i]]
+  first_col <- as.character(df[[1]])
+  vector_name <- paste0("set", unique(df[[4]]))
+  names(first_col) <- NULL
+  names <- setNames(list(first_col), vector_name)
+  return(names)
+}) 
+genesetsCOG_NE <- unlist(genesetsCOG_NE, recursive = FALSE)  
 
-#then, pipe the list into writeGmtPathways(); declare pathways <- Gmtpathways(written)
 
-writeGmtPathways(genesetsCOG, tempfile("COGsets", fileext = ".gmt")) #creates file in temp dir which must be manually retrieved, also includes like a hexadecimal id (or maybe it's just random numbers and letters?) which I deleted
-pathways <- gmtPathways("COGsets.gmt") #I added this renamed file to my R working directory
+#WRITE PATHWAY FILES AND DECLARE AS VARIABLES
+
+
+writeGmtPathways(genesetsCOG_ES, tempfile("COGsets_ES", fileext = ".gmt")) #creates file in user/appdata/local/temp/[random id] dir which must be manually retrieved, also includes like a hexadecimal id (or maybe it's just random numbers and letters?) which I deleted
+
+writeGmtPathways(genesetsCOG_NE, tempfile("COGsets_NE", fileext = ".gmt"))
+
+pathways_ES <- gmtPathways("COGsets_ES.gmt") #I added this renamed file to my R working directory
+pathways_NE <- gmtPathways("COGsets_NE.gmt")
+
+
+#LOAD IN TLIKE TEST STATISTIC DATA TO BUILD RANKING FILES
+
 
 tlike_data <- read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/fit_t.tab")
 #tlike_data <- read.delim(~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_t.tab")
@@ -958,12 +1086,11 @@ tlike_data <- tlike_data[, -c(18:22)] #removes t0
 tlike_col_ranges <- list(
   nodN = c(2:5),
   nodamb = c(6:10),
-  bactN = c(11:14),
-  bactamb = c(15:17)
+  bactN = c(11:13),
+  bactamb = c(14:15)
 ) #defines ranges of columns containing data for each treatment/compartment combination to be averaged together
 
 tlike_data_meaned <- data.frame(ID = tlike_data$locusId) #creates df to be populated by meaned t-like data
-
 
 for (i in 1:nrow(tlike_data)) {
   new_values <- numeric(length(tlike_col_ranges))  #goes through each row of tlike_data and creates new df of the proper length with the same rows as the parent
@@ -1006,7 +1133,7 @@ tlike_bactamb_ranked <- tlike_bactamb_ranked[order(-tlike_bactamb_ranked$x),,dro
 # write.table(tlike_nodN_ranked, file = "C:/Users/User/Desktop/nodN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
 # write.table(tlike_nodamb_ranked, file = "C:/Users/User/Desktop/nodamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
 # write.table(tlike_bactN_ranked, file = "C:/Users/User/Desktop/bactN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
-# write.table(tlike_bactamb_ranked, file = "C:/Users/User/Desktop/bactamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE) #creates tab-delimited .rnk files for gene set enrichment analysis
+# write.table(tlike_bactamb_ranked, file = "C:/Users/User/Desktop/bactamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE) #creates tab-delimited .rnk files for gene set enrichment analysis; these can be found on github at [path]
 
 nodNranks <- read.table("C:/Users/User/Desktop/nodN_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
 nodambranks <- read.table("C:/Users/User/Desktop/nodamb_ranked.rnk", header=TRUE, colClasses = c("character", "numeric"))
@@ -1026,23 +1153,185 @@ names(bactN_ranks) <- rownames(bactNranks)
 bactamb_ranks <- as.numeric(unlist(bactambranks$x))
 names(bactamb_ranks) <- rownames(bactambranks) #final retype and rename for fgsea
 
-#then, run geseca() and fgsea()
 
-fgsea_nodN <- fgsea(pathways, nodN_ranks, minSize = 1, maxSize = 1100)
-fgsea_nodamb <- fgsea(pathways, nodamb_ranks, minSize = 1, maxSize = 1100)
-fgsea_bactN <- fgsea(pathways, bactN_ranks, minSize = 1, maxSize = 1100)
-fgsea_bactamb <- fgsea(pathways, bactamb_ranks, minSize = 1, maxSize = 1100)
+#RUN FGSEA AND GESECA ANALYSES
+
+
+fgsea_nodN_ES <- fgsea(pathways_ES, nodN_ranks, minSize = 1, maxSize = 1100)
+fgsea_nodamb_ES <- fgsea(pathways_ES, nodamb_ranks, minSize = 1, maxSize = 1100)
+fgsea_bactN_ES <- fgsea(pathways_ES, bactN_ranks, minSize = 1, maxSize = 1100)
+fgsea_bactamb_ES <- fgsea(pathways_ES, bactamb_ranks, minSize = 1, maxSize = 1100)
+
+fgsea_nodN_NE <- fgsea(pathways_NE, nodN_ranks, minSize = 1, maxSize = 1100)
+fgsea_nodamb_NE <- fgsea(pathways_NE, nodamb_ranks, minSize = 1, maxSize = 1100)
+fgsea_bactN_NE <- fgsea(pathways_NE, bactN_ranks, minSize = 1, maxSize = 1100)
+fgsea_bactamb_NE <- fgsea(pathways_NE, bactamb_ranks, minSize = 1, maxSize = 1100)
+
+require("preprocessCore")
 
 geseca_data <- tlike_data
-rownames(geseca_data) <- geseca_data$locusId
-geseca_data <- geseca_data[, -c(1)]
+geseca_data <- geseca_data[, -c(1)] #the normalize.quantiles function erases row names so some shenanigans are needed
+geseca_data <- normalize.quantiles(as.matrix(geseca_data))
+geseca_data <- as.data.frame(geseca_data)
+rownames(geseca_data) <- tlike_data$locusId
 
-geseca_rbtnseq <- geseca(pathways, geseca_data, minSize = 1, maxSize = 1100)
+geseca_rbtnseq_ES <- geseca(pathways_ES, geseca_data, minSize = 1, maxSize = 1100)
+geseca_rbtnseq_NE <- geseca(pathways_NE, geseca_data, minSize = 1, maxSize = 1100)
+
+
+```
+
+``` {r Chunk 12: KEGG analyses}
+
+
+#load in data
+newtags <- fitmetadata[, c(1, 2, 5, 10, 11, 18)]
+
+# newtags <- newtags[, -c(1, 3, 4, 5)]
+# newtags <- newtags[complete.cases(newtags), ]
+# write.csv(newtags, "C:/Users/User/Desktop/aaseq2_newIDs_smeliplant.csv", row.names = FALSE) #this was submitted to blastKOALA to reannotate the genome in case there are any kegg kos associated with only the new tags
+
+newtags <- newtags[, -c(6)] #remove extraneous column used to generate csv file for reannotation
+
+newtags$KEGG_ko <- NA #ditto
+
+
+#match kegg KOs associated with old locus tags to the tags here to create kegg KO list
+for (i in 1:nrow(newtags)) {
+  locus_tag <- newtags[i, "locus_tag"]
+    match_row <- KEGGcomplete$locus_tag == locus_tag
+    if (any(match_row)) {
+    newtags[i, "KEGG_ko"] <- KEGGcomplete$KEGG_ko[match_row]
+  }
+} 
+
+newtag_KEGG <- read.csv("C:/Users/User/Desktop/new_locustags_keggko.csv") #df containing tags matched by blastKOALA to new locus tags, in case we can get more KEGG information that way
+
+
+#match new locus tags in newtags to new locus tags in newtag_KEGG, and copy over new Kegg kos only if they are NOT - or NA. Just in case annotations aren't consistent between the old and new tags
+for (i in 1:nrow(newtags)) {
+  new_locus_tag <- newtags[i, "new.locus.tag"]
+  match_row <- newtag_KEGG$new.locus.tag == new_locus_tag & !is.na(newtag_KEGG$new.locus.tag)
+  
+  if (any(match_row, na.rm = TRUE)) {
+    keggko <- newtag_KEGG$KEGG_ko[match_row]
+    
+    if (!is.na(keggko) && !grepl("^-", keggko) && grepl("^K", keggko)) {
+      newtags[i, "KEGG_ko"] <- keggko
+    }
+  }
+} 
+
+
+#cleans up KEGG ids by removing "ko:" leading characters from some kos
+for (i in 1:nrow(newtags)) {
+  keggko <- newtags[i, "KEGG_ko"]
+  if (!is.na(keggko) && grepl("ko:", keggko)) {
+    newtags[i, "KEGG_ko"] <- gsub("ko:", "", keggko, fixed = FALSE)
+  }
+} 
+
+#load in fitness data and merge with cleaned-up and reannotated KEGG tags
+KEGGfitdata <- t(completefit)
+KEGGfitmetadata <- merge(newtags, KEGGfitdata, by.x = "locus_tag", by.y = "row.names", all.x = TRUE) 
+KEGGfitmetadata <- KEGGfitmetadata %>%
+  separate_rows(KEGG_ko, sep = "/") #splits and duplicates rows with kos like this: id/id. These are separate genes in a two-gene operon which are annotated as one for some
+
+
+#preps data for contingency tables by replacing low fitness values w -1, high ones w 1, neutral w 0, and deletes NAs created by blastkoala annotation including genes which are fatal upon insertional inactivation
+KEGGnumeric_cols <- which(sapply(KEGGfitmetadata, is.numeric)) #same process as COG analysis; picks out numeric data to be worked with
+for (col in KEGGnumeric_cols) {
+  KEGGfitmetadata[[col]] <- ifelse(KEGGfitmetadata[[col]] <= -1, -1,
+                                       ifelse(KEGGfitmetadata[[col]] >= 1, 1, 0))
+} 
+
+for (i in 1:nrow(KEGGfitmetadata)) {
+  if (any(is.na(KEGGfitmetadata[i, ]))) {
+    KEGGfitmetadata <- KEGGfitmetadata[-i, ]
+  }
+} 
+
+#create subsets by essentiality for symbiosis
+KEGGfitmetadata_ES <- subset(KEGGfitmetadata, essentiality == "essential")
+KEGGfitmetadata_NE <- subset(KEGGfitmetadata, essentiality == "N")
+KEGGfitmetadata_ES <- KEGGfitmetadata_ES[, -c(3)]
+KEGGfitmetadata_NE <- KEGGfitmetadata_NE[, -c(3)] 
+
+KEGGfitmetadata_ES$KEGG_Pathway <- trimws(KEGGfitmetadata_ES$KEGG_Pathway)
+KEGGfitmetadata_NE$KEGG_Pathway <- trimws(KEGGfitmetadata_NE$KEGG_Pathway)
+KEGGfitmetadata_ES$KEGG_Pathway <- as.character(KEGGfitmetadata_ES$KEGG_Pathway)
+KEGGfitmetadata_NE$KEGG_Pathway <- as.character(KEGGfitmetadata_NE$KEGG_Pathway) #apparently have to do this to get strsplit() to work
+
+#list names of unique pathway ids for making contingency tables downstream
+KEGGtablenames_ES <- character() #create vector of contingency table names
+for (i in seq_len(nrow(KEGGfitmetadata_ES))) {
+  pathway_ids <- unlist(strsplit(KEGGfitmetadata_ES[["KEGG_Pathway"]][i], ",")) #unlist current cell in KEGG_Pathway by , separator
+  for (pathway_id in pathway_ids) {
+    pathway_id <- trimws(pathway_id)
+    if (grepl("^ko\\d{5}$", pathway_id) && !pathway_id %in% KEGGtablenames_ES) {
+      KEGGtablenames_ES <- c(KEGGtablenames_ES, pathway_id) #if KEGG id starts with ko and is followed by 5 numbers, and this particular one isn't already added to KEGGtablenames, then add it
+    }
+  }
+}
+
+KEGGtablenames_NE <- character() 
+for (i in seq_len(nrow(KEGGfitmetadata_NE))) {
+  pathway_ids <- unlist(strsplit(KEGGfitmetadata_NE[["KEGG_Pathway"]][i], ","))
+  for (pathway_id in pathway_ids) {
+    pathway_id <- trimws(pathway_id) 
+    if (grepl("^ko\\d{5}$", pathway_id) && !pathway_id %in% KEGGtablenames_NE) {
+      KEGGtablenames_NE <- c(KEGGtablenames_NE, pathway_id)
+    }
+  }
+}
+
+
+#expand pathway id list and duplicate rows, putting one koXXXXX id in each row
+expanded_rows_ES <- data.frame(KEGG_Pathway = character(), stringsAsFactors = FALSE)
+expanded_rows_NE <- data.frame(KEGG_Pathway = character(), stringsAsFactors = FALSE) #make aux dfs to work with inside the loops
+
+for (i in seq_len(nrow(KEGGfitmetadata_ES))) {
+  pathway_ids <- unlist(strsplit(as.character(KEGGfitmetadata_ES[i, "KEGG_Pathway"]), ",")) #split pathway id cells
+  pathway_ids <- pathway_ids[!grepl("^map\\d{5}$", pathway_ids)] #get rid of map ids
+  
+  for (pathway_id in pathway_ids) {
+    new_row <- KEGGfitmetadata_ES[i, ]
+    new_row[["KEGG_Pathway"]] <- trimws(pathway_id) #duplicate rows containing multiple pathway ids
+    expanded_rows_ES <- rbind(expanded_rows_ES, new_row) #add duplicate row to recipient df
+  }
+}
+
+for (i in seq_len(nrow(KEGGfitmetadata_NE))) {
+  pathway_ids <- unlist(strsplit(as.character(KEGGfitmetadata_NE[i, "KEGG_Pathway"]), ","))
+  pathway_ids <- pathway_ids[!grepl("^map\\d{5}$", pathway_ids)]
+  
+  for (pathway_id in pathway_ids) {
+    new_row <- KEGGfitmetadata_NE[i, ]
+    new_row[["KEGG_Pathway"]] <- trimws(pathway_id)
+    expanded_rows_NE <- rbind(expanded_rows_NE, new_row)
+  }
+}  #expand and duplicate by pathway id as in COG analysis
+
+KEGGfitmetadata_ES <- expanded_rows_ES[complete.cases(expanded_rows_ES), , drop = FALSE]
+KEGGfitmetadata_NE <- expanded_rows_NE[complete.cases(expanded_rows_NE), , drop = FALSE] #removes rows with NAs
+
+#next steps for KEGG stuff: make list of dfs for ES/NE of each pathway set -> unlist into over 400 individual dfs (bad idea??) -> relist names in a list -> remove t0 and other unnecessary columns from each df in list -> define col ranges corresponding to each t/c combination and sum together, make empty contingency tables and labels, name according to represented pathway -> make list of all empty table dfs -> sum each treatment together for each pathway set and fill in corresponding table with summed values 
+
+#Contingency tables and Fisher tests; need to figure out how to make tables by pathway id
+
+
+
+
+#fgsea and geseca
+
+
+
+
 
 ```
 
 
-``` {r Chunk 12: Turnover analyses}
+``` {r Chunk 13: Turnover analyses}
 
 library(betapart)
 
@@ -1052,7 +1341,7 @@ fit_turnoverdat <- ifelse(completefit <= -1, -1, ifelse(completefit >= 1, 1, 0))
 
 fit_turnoverdat <- as.data.frame(fit_turnoverdat[1:(nrow(fit_turnoverdat) - 5),])
 turnover_fit_nodule <- fit_turnoverdat[1:8 ,]
-turnover_fit_bacteroid <- fit_turnoverdat[9:13 ,]
+turnover_fit_bacteroid <- fit_turnoverdat[9:14 ,]
 
 fit_turnoverdat <- as.matrix(fit_turnoverdat)
 
@@ -1069,10 +1358,26 @@ turnover_permanova
 ```
 
 
-```{r Chunk 13: Tentative graveyard zone}
+```{r Chunk 14: Tentative graveyard zone}
 
-#empty as of now, since the rarefaction stuff was split off into a separate file
+#commented code is for duplicating kegg ko ids to run functional analysis. I decided to use pathway ids only so this is deprecated 
 
+# newtags_modified <- newtags #save duplicate in case something gets messed up while coding
+# 
+# for (i in 1:nrow(newtags_modified)) {
+#   kegg_ko <- newtags_modified[i, "KEGG_ko"]
+#   if (!is.na(kegg_ko) && grepl(",", kegg_ko)) {
+#     kegg_ids <- unlist(strsplit(kegg_ko, ",")) #splits entries with multiple KEGG KOs by the comma separator
+#     for (id in kegg_ids) {
+#       new_row <- newtags_modified[i, ]
+#       new_row["KEGG_ko"] <- trimws(id) #creates duplicate rows and adds new KEGG id
+#       newtags_modified <- rbind(newtags_modified, new_row)
+#     }
+#     newtags_modified <- newtags_modified[-i, ] #gets rid of original KEGG id row with unsplit entries
+#     i <- i - 1  #adjust the index to account for removed row
+#   }
+# }
+# row.names(newtags_modified) <- NULL #fixes weird row names created by this procedure
 ```
 
 ---
