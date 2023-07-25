@@ -12,14 +12,29 @@ Goal: match the RBH to whether or not genes are essential or not in the HMMER re
 
 #data
 ```{r}
-matches = read.delim("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/out_smeliplant.txt",header=FALSE)
-colnames(matches) <- c("wheatleyID", "rbtnseqID")
-non_estl = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/Rlv_nonessential gene list.csv")
-non_estl$estl <- rep('N',nrow(non_estl))
-tnseq_genes_old = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/old_annotations_smeliplant.csv")
-tnseq_genes_prot = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/proteins_smeli.csv")
+# matches = read.delim("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/out_smeliplant.txt",header=FALSE)
 
-sog = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/aaseq2_smeliplant.csv") #sog = single orthologous genes
+matches = read.delim("C:/Users/User/Desktop/analyze_Nfitness/out_smeliplant.txt", header=FALSE)
+
+colnames(matches) <- c("wheatleyID", "rbtnseqID")
+
+#non_estl = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/Rlv_nonessential gene list.csv")
+
+non_estl = read.csv("C:/Users/User/Desktop/analyze_Nfitness/Rlv_nonessential gene list.csv")
+
+non_estl$estl <- rep('N',nrow(non_estl))
+
+#tnseq_genes_old = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/old_annotations_smeliplant.csv")
+
+tnseq_genes_old = read.csv("C:/Users/User/Desktop/analyze_Nfitness/old_annotations_smeliplant.csv")
+
+#tnseq_genes_prot = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/proteins_smeli.csv")
+
+tnseq_genes_prot = read.csv("C:/Users/User/Desktop/analyze_Nfitness/proteins_smeli.csv")
+
+#sog = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/aaseq2_smeliplant.csv") #sog = single orthologous genes
+
+sog = read.csv("C:/Users/User/Desktop/analyze_Nfitness/aaseq2_smeliplant.csv")
 ```
 
 #match protein ids with the old locus tags
@@ -51,11 +66,12 @@ for(i in 1:nrow(locus_ref)) {
 }
 
 #count the number of neutral genes
-nrow(locus_ref[locus_ref$essential=='N',]) #4856
+nrow(locus_ref[locus_ref$essential=='N',]) #2712
 ```
 
 #Add the orthogroup IDs
 ```{r}
+
 
 
 #add essentiality to matches list
@@ -77,9 +93,9 @@ for(i in 1:nrow(sog)) {
 count = is.na(sog$estl)
 length(count[count==TRUE]) #16 genes we did not obtain a RBH for during analysis.
 
-#if there was no match, make it essential to be conservative
+#if there was no match, make it nonessential to be conservative
 for(i in 1:nrow(sog)) {
-  ifelse(is.na(sog[i,3]),sog[i,3] <- 'essential',print(i))
+  ifelse(is.na(sog[i,3]),sog[i,3] <- 'N',print(i))
 }
 
 #count the number of neutral genes
@@ -95,6 +111,8 @@ for(j in 1:nrow(sog)) {
   }
 }
 
+# write.csv(sog, 'C:/Users/User/Desktop/smeliplant_neutral.csv')
+
 # NOTE: this nested for loop was created with the help of ChatGPT. The original for loop, provided here, did not work properly:
 
 #add gene description to sog file
@@ -107,19 +125,24 @@ for(j in 1:nrow(sog)) {
 
 # ChatGPT was asked to assist in writing a version of the commented for loop which would successfully iterate across all entries in the tnseq_genes_prot$product column. It was specified in-prompt that an optimized, nested structure would be necessary to accomplish this; ChatGPT provided the which() argument and wrote the syntax of the second for loop.
 
-write.csv(sog,'~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral.csv')
+# write.csv(sog,'~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral.csv')
 ```
 
 #Add the annotation data from eggnog mapper
 ```{r}
-cogs = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/emapper_analysis_smeliplant.csv")
+#cogs = read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/emapper_analysis_smeliplant.csv")
+
+cogs = read.csv("C:/Users/User/Desktop/analyze_Nfitness/emapper_analysis_smeliplant.csv")
+
 cogs$essential = rep('A')
 
 for(i in 1:nrow(cogs)) {
-  ogs1 = cogs[i,2]
-  estl1 = subset(sog,orthogroup==ogs1,select=estl)[1,]
-  cogs[i,8] <- estl1
+  ogs1 = cogs[i,1]
+  estl1 = subset(sog,id==ogs1,select=estl)[1,]
+  cogs[i,22] <- estl1
 }
 
-write.csv(cogs,'~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral_cog.csv')
+# write.csv(cogs, 'C:/Users/User/Desktop/smeliplant_neutral_cog.csv')
+
+# write.csv(cogs,'~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral_cog.csv')
 ```
