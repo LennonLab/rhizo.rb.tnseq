@@ -715,12 +715,28 @@ ks_results_table <- data.frame(Dval = numeric(length(ks_objects)),
 
 for (i in seq_along(ks_objects)) {
   ks_test_name <- ks_objects[i]
-  ks_test_result <- get(ks_test_name)  # Retrieve the K-S test result object using its name
+  ks_test_result <- get(ks_test_name)  #retrieve the K-S test result object using its name
   ks_results_table[i, "Dval"] <- ks_test_result$statistic
   ks_results_table[i, "qval"] <- adjusted_pvals_ks[[i]]
 }
 
 rownames(ks_results_table) <- ks_objects #set row names to corresponding K-S test
+
+#build individual tables of k_s results for pairing with fitrank plots
+
+row_names_nodES <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
+row_names_nodNE <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
+row_names_complete <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
+row_names_Nmetab <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N") #row names
+
+fitrank_nodES <- ks_results_table[c("ks_amb_nodES_fit", "ks_bacteroid_nodES_fit", "ks_fert_nodES_fit", "ks_nodule_nodES_fit"), ]
+rownames(fitrank_nodES) <- row_names_nodES
+fitrank_nodNE <- ks_results_table[c("ks_amb_nodNE_fit", "ks_bacteroid_nodNE_fit", "ks_fert_nodNE_fit", "ks_nodule_nodNE_fit"), ]
+rownames(fitrank_nodNE) <- row_names_nodNE
+fitrank_complete <- ks_results_table[c("ks_amb_compartment_fit", "ks_bacteroid_fit", "ks_fert_compartment_fit", "ks_nodule_fit"), ]
+rownames(fitrank_complete) <- row_names_complete
+fitrank_Nmetab <- ks_results_table[c("ks_amb_compartment_Nmetab_fit", "ks_bacteroid_Nmetab_fit", "ks_fert_compartment_Nmetab_fit", "ks_nodule_Nmetab_fit"), ]
+rownames(fitrank_Nmetab) <- row_names_Nmetab #pull ks test statistics and set row names to name the comparison more clearly
 
 ```
 
@@ -1173,7 +1189,7 @@ for (i in seq_along(COGnames)) {
   neutral_N <- sum(df$neutral[df$essentiality == "N"]) #total up neutral column for each category (redundant for organization)
     
   df_negative <- data.frame(
-    negative = c(negative_essential, negative_N) / 13,  # Divide by 13
+    negative = c(negative_essential, negative_N) / 13,  #divide by 13 because 13 reps
     neutral = c(neutral_essential, neutral_N) / 13
   )   #create the data frame for COG_X_negative and set row names
   
@@ -1214,7 +1230,7 @@ adjusted_fisher_pvals <- p.adjust(fisher_pvals, method = "fdr")
 ``` {r Chunk 12: fgsea and geseca for COGs}
 
 #code is commented out if its only purpose is to build input files, as these only need to be run once
-#
+# 
 # COGmatrices_nodES <- subset(COGmatrices, COGmatrices$essentiality == "essential")
 # COGmatrices_nodNE <- subset(COGmatrices, COGmatrices$essentiality == "N") #subset data by essentiality for symbiosis
 # 
