@@ -423,18 +423,15 @@ ranked_nodES_nodfert <- rankfit(nodES_nodfertrank)
 ranked_nodES_t0 <- rankfit(nodES_t0rank)
 
 
-# Combine the ranking data for the nodES partition
 combined_nodES <- data.frame(
   nodamb = ranked_nodES_nodamb$x,
   nodfert = ranked_nodES_nodfert$x,
   bactamb = ranked_nodES_bactamb$x,
   bactfert = ranked_nodES_bactfert$x
-)
+) #combine 
 
-# Match row names
-rownames(combined_nodES) <- rownames(ranked_nodES_nodamb)
+rownames(combined_nodES) <- rownames(ranked_nodES_nodamb) #match row names
 
-# Combine the ranking data for the nodNE partition
 combined_nodNE <- data.frame(
   nodamb = ranked_nodNE_nodamb$x,
   nodfert = ranked_nodNE_nodfert$x,
@@ -442,10 +439,8 @@ combined_nodNE <- data.frame(
   bactfert = ranked_nodNE_bactfert$x
 )
 
-# Match row names
 rownames(combined_nodNE) <- rownames(ranked_nodNE_nodamb)
 
-# Combine the ranking data for the complete partition
 combined_complete <- data.frame(
   nodamb = ranked_nodamb$x,
   nodfert = ranked_nodfert$x,
@@ -453,10 +448,8 @@ combined_complete <- data.frame(
   bactfert = ranked_bactfert$x
 )
 
-# Match row names
 rownames(combined_complete) <- rownames(ranked_nodamb)
 
-# Combine the ranking data for the Nmetab partition
 combined_Nmetab <- data.frame(
   nodamb = ranked_Nmetab_nodamb$x,
   nodfert = ranked_Nmetab_nodfert$x,
@@ -464,7 +457,6 @@ combined_Nmetab <- data.frame(
   bactfert = ranked_Nmetab_bactfert$x
 )
 
-# Match row names
 rownames(combined_Nmetab) <- rownames(ranked_Nmetab_nodamb)
 
 
@@ -862,7 +854,14 @@ ggplot(covar_scores_Nmetab,aes(x=PC1,y=PC2, color = finalmetadata$Ntreatment, sh
         axis.text.x=element_text(size=rel(0.9)),
         axis.text.y=element_text(size=rel(0.9)))
 
+compare_sym <- protest(pca_covar_nodES, pca_covar_nodNE, permutations=9999)
+
+compare_sym
+
+plot(compare_sym)
+
 ```
+
 
 ``` {r Chunk 9: COG analyses}
 
@@ -1440,6 +1439,12 @@ KEGG_geseca_rbtnseq_NE <- geseca(pathways_keggNE, geseca_data, minSize = 1, maxS
 
 all_fgsea_cog <- ls(pattern = "fgsea", envir = globalenv()) #find all fgsea results
 
+# for (df_name in all_fgsea_cog) {
+#   df <- get(df_name)
+#   df <- df[!grepl("set-|set_-", df[, 1]), ] #remove unannotated sets from results
+#   assign(df_name, df, envir = .GlobalEnv)
+# } #commenting this out because the unannotated genes might be interesting? idk
+
 for (fgsea_name in all_fgsea_cog) {
   fgsea_obj <- get(fgsea_name)
   
@@ -1539,7 +1544,6 @@ for (group_pair in group_pairs) {
 }
 ls(envir = fgsea_plotting)
 
-# Custom function to perform replacements based on patterns
 replace_group_names <- function(group_name) {
   replacements <- c(
     "bactamb" = "ambient",
@@ -1550,31 +1554,25 @@ replace_group_names <- function(group_name) {
     "nodN" = "enriched",
     "KEGG_bactN" = "enriched",
     "KEGG_nodN" = "enriched"
-  )
+  ) #replace group names for plotting purposes
   
-  # Check if the group_name matches any pattern, and replace accordingly
   for (pattern in names(replacements)) {
     if (grepl(pattern, group_name)) {
       return(replacements[pattern])
     }
-  }
+  }   #check if the group_name matches any pattern, and replace accordingly
   
-  # If no match is found, return the original group_name
-  return(group_name)
+  return(group_name) #return original if no match found
 }
 
-# Loop through each data frame in fgsea_plotting
 for (df_name in ls(envir = fgsea_plotting)) {
   df <- get(df_name, envir = fgsea_plotting)
   
-  # Apply the custom function to replace group names
-  df$group <- sapply(df$group, replace_group_names)
+  df$group <- sapply(df$group, replace_group_names) #replace group names for all data to be plotted
   
-  # Store the modified data frame back in fgsea_plotting
-  assign(df_name, df, envir = fgsea_plotting)
+  assign(df_name, df, envir = fgsea_plotting) #reassign
 }
 
-# Check the modified group names
 unique(fgsea_plotting$fgsea_collated_ES$group)
 unique(fgsea_plotting$fgsea_collated_NE$group)
 
@@ -1595,9 +1593,8 @@ for (df_name in df_names) {
           panel.background = element_rect(fill = "white"),
           axis.text.x = element_text(size = rel(1.2)),
           axis.text.y = element_text(size = rel(1.2))) +
-    ylim(y_limits)  # Set the y-axis limits here
+    ylim(y_limits)
   
-  # Print the plot
   print(p)
 }
 
@@ -1645,6 +1642,108 @@ for (gene_id in all_gene_ids) {
   }
 } #if there is a matching row for a leading edge gene in the master df containing all gene data, pull that data from the master df into a new one
 row.names(leadingEdge_allgenes) <- NULL #clean up weird row names
+
+
+#K-S rank-order vs gene order cor tests
+
+split_dfs <- split(rankfitdata, rankfitdata$V1) #splits rank fitness data into treatment groups
+names(split_dfs) <- paste0(names(split_dfs), "_genomeorder")
+split_dfs <- lapply(split_dfs, function(df) df[, -which(names(df) == "V1")]) #deletes extra col
+
+list_of_vectors <- lapply(split_dfs, function(df) {
+  apply(df, 1, function(row) {
+    names(row) <- colnames(df)
+    return(row)
+  })
+}) #splits each df into individual vectors each containing 1 of the replicates
+
+for (i in seq_along(list_of_vectors)) {
+  vector_name <- names(list_of_vectors)[i]
+  df <- as.data.frame(t(list_of_vectors[[i]]))
+  rownames(df) <- colnames(list_of_vectors[[i]]) #converts double to df, preserving row/col names
+
+  assign(vector_name, df, envir = .GlobalEnv)
+}
+
+genomeorder_dfs <- grep("_genomeorder$", ls(), value = TRUE)
+
+
+genomeorder_replicates <- list()
+
+for (df_name in genomeorder_dfs) {
+  df <- get(df_name)
+  for (row_name in rownames(df)) {
+    row_vector <- df[row_name, , drop = FALSE]
+    vector_name <- paste0(df_name, "_", row_name)
+    genomeorder_replicates[[vector_name]] <- row_vector
+  }
+} #splits all dfs in genomeorder_dfs into constituent rows, preserving row/col names
+
+#function to sort the genome-order dfs into increasing order by fitness score while preserving names
+rank_sort <- function(my_ranking_df) {
+  row_vector <- unlist(my_ranking_df)
+    sorted_indices <- order(row_vector, decreasing = FALSE)
+  sorted_values <- row_vector[sorted_indices]
+  sorted_names <- names(row_vector)[sorted_indices] #sorts names along with numerical data
+  
+  sorted_df <- data.frame(setNames(sorted_values, sorted_names), stringsAsFactors = FALSE)
+  return(sorted_df) #returns sorted df as new object
+}
+
+rankorder_replicates <- lapply(genomeorder_replicates, rank_sort)
+
+replicate_names <- names(rankorder_replicates)
+replicate_names <- gsub("_genome", "_rank", replicate_names, fixed = TRUE) #modify names to reflect re-ordering
+names(rankorder_replicates) <- replicate_names #reassign
+
+rankorder_replicates <- lapply(rankorder_replicates, t) #flips them to same orientation as genome order objects
+for (i in seq_along(rankorder_replicates)) {
+  rownames(rankorder_replicates[[i]]) <- NULL
+}
+
+rankorder_replicates <- lapply(rankorder_replicates, t)
+
+genomeorder_replicates <- lapply(genomeorder_replicates, t)
+
+rankshift_test <- cor.test(genomeorder_replicates[["bact_ambient_genomeorder_037"]], rankorder_replicates[["bact_ambient_rankorder_037"]], method = "pearson")
+
+rankshift_test2 <- cor.test(genomeorder_replicates[["bact_ambient_genomeorder_037"]], rankorder_replicates[["bact_ambient_rankorder_040"]], method = "pearson")
+
+
+rankshift_test3 <- cor.test(genomeorder_replicates[["bact_ambient_genomeorder_037"]], genomeorder_replicates[["bact_ambient_genomeorder_040"]])
+
+#NOTE: more code needed to make big cor matrices and run omnibus cor tests assuming we get this weirdness ironed out
+
+#pSym proportion analysis
+
+symbiotic_plasmid_count <- 0
+chromosome_count <- 0
+
+for (gene_name in fitmetadata$locus_tag) {
+  if (startsWith(gene_name, "SM_") || startsWith(gene_name, "SMa")) {
+    symbiotic_plasmid_count <- symbiotic_plasmid_count + 1
+  } else if (startsWith(gene_name, "SMc")) {
+    chromosome_count <- chromosome_count + 1
+  }
+}
+
+LE_symcount <- 0
+LE_chromcount <- 0
+
+for (gene_name in leadingEdge_allgenes$locus_tag) {
+  if (startsWith(gene_name, "SM_") || startsWith(gene_name, "SMa")) {
+    LE_symcount <- LE_symcount + 1
+  } else if (startsWith(gene_name, "SMc")) {
+    LE_chromcount <- LE_chromcount + 1
+  }
+}
+
+replicon_table <- matrix(c(symbiotic_plasmid_count, chromosome_count, LE_symcount, LE_chromcount), nrow = 2, byrow = TRUE)
+
+
+replicontest <- chisq.test(replicon_table)
+
+replicontest
 
 ```
 
