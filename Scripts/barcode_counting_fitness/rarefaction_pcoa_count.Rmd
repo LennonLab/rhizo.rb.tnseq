@@ -1,0 +1,75 @@
+---
+title: "rarefaction_pcoa_count"
+author: "John McMullen, Caleb Hill"
+date: "2023-05-11"
+output: html_document
+---
+
+```{r}
+
+library("vegan")
+
+rbdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts.tab")
+# rbdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts.tab")
+
+rownames(rbdat) <- rbdat$comb
+rbdat = t(rbdat[,-c(1:4)])
+metadata = as.data.frame(matrix(ncol=2,nrow=21))
+metadata[,1] <-c(rep("nod",9),rep("bact",7),rep("start",5))
+metadata[,2] <-c(rep("fertilized",4),rep("ambient",5),rep("fertilized",4),rep("ambient",3),rep("time0",5))
+colnames(metadata) <- c("compartment","Ntreatment")  #this cleans up and labels data by treatment/compartment
+
+rel.dat = decostand(rbdat,method="total") #standardize counts data by total
+relnewnames <- substr(row.names(rel.dat), 7, 9)
+relnewnames
+rownames(rel.dat) <- relnewnames #rename rows to extract number ID
+
+reldat2 <- subset(rel.dat, row.names(rel.dat) %in% c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040"))
+metadata2 <- subset(metadata, compartment!= "start") #reldat2 and metadata2 have the t0 data filtered out for pcoa, etc.
+
+pcoa = capscale(reldat2~1,distance = "bray")
+head(summary(pcoa))
+biplot(pcoa)
+pcoa.sites = scores(pcoa,display = "sites") #see loadings, takes awhile
+
+pcoa.sites = as.data.frame(scores(pcoa,display = "sites"))
+
+ggplot(pcoa.sites,aes(x=MDS1,y=MDS2,color=metadata2$compartment,shape=metadata2$Ntreatment)) +
+  geom_point(size=8)+
+  xlab("PCo 1 (18%)") +
+  ylab("PCo 2 (14%)") +
+  theme_bw(base_size = 30) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(size = 1, colour = "black",fill=NA),
+        panel.background = element_rect(fill="white"),
+        axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
+        axis.text.y=element_text(size=rel(0.9))) #initial pcoa assessment to see where the groups fall
+
+# rarefaction curve
+
+counting <- rowSums(rbdat) #total reads per site/pot
+counting
+
+raremax <- min(rowSums(rbdat))
+raremax #smallest number of reads for a site
+
+Srare <- rarefy(rbdat, raremax)
+Srare #rare genes
+
+labelnames <- data.frame(rownames(rbdat)) #make smaller labels for rarefaction curve 
+shortnames <- str_sub(labelnames$rownames.rbdat., 7, 22)
+shortnames
+
+cleannames <- gsub('\\.', ' ',shortnames)
+numbersonly <- substring(labelnames$rownames.rbdat., 7, 9)
+cleannames #these are meant to be passed through ordilabel() to create cleaner labels for the rarefaction curve but I'm still working on the syntax
+
+rownames(rbdat) <- numbersonly
+cols <- c("darkred", "darkred", "darkred", "darkred", "forestgreen", "forestgreen", "forestgreen", "forestgreen", "forestgreen", "blue", "blue", "blue", "blue", "purple", "purple", "purple", "orange", "orange","orange","orange","orange")
+
+rbrar <- rarecurve(rbdat, step = 500, sample = 1000000, xlab = "Total barcodes", ylab = "Unique barcodes", col = cols, cex = 0.5, label = TRUE)
+rbrar
+
+```
+
+
