@@ -3,49 +3,77 @@ title: "rarefaction_pcoa_count"
 author: "John McMullen, Caleb Hill"
 date: "2023-05-11"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
+##Libraries
 ```{r}
+#Libraries required 
 
-library("vegan")
+library(vegan) #relative gene counts and PCoA
+library(ggplot2) #plotting
+library(MoMAColors) #color palette
+```
 
-rbdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts.tab")
-# rbdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts.tab")
+##Data
+```{r}
+#Open the data from the automatically generated data from the FEBA pipeline.
+#rbdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts.tab")
+rbdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts.tab")
 
+#Use the gene name ids as rownames
 rownames(rbdat) <- rbdat$comb
+
+#Remove the metadata
 rbdat = t(rbdat[,-c(1:4)])
-metadata = as.data.frame(matrix(ncol=2,nrow=21))
-metadata[,1] <-c(rep("nod",9),rep("bact",7),rep("start",5))
-metadata[,2] <-c(rep("fertilized",4),rep("ambient",5),rep("fertilized",4),rep("ambient",3),rep("time0",5))
+
+#Create a separate data frame for metadata
+metadata = as.data.frame(matrix(ncol=3,nrow=21))
+metadata[,1] <- c(rep("undifferentiated",9),rep("bacteroid",7),rep("start",5))
+metadata[,2] <- c(rep("fertilized",4),rep("ambient",5),rep("fertilized",4),rep("ambient",3),rep("time0",5))
+metadata[,3] <-  
 colnames(metadata) <- c("compartment","Ntreatment")  #this cleans up and labels data by treatment/compartment
 
+#Relativize data by row 
 rel.dat = decostand(rbdat,method="total") #standardize counts data by total
 relnewnames <- substr(row.names(rel.dat), 7, 9)
 relnewnames
 rownames(rel.dat) <- relnewnames #rename rows to extract number ID
 
+#time zero were removed
 reldat2 <- subset(rel.dat, row.names(rel.dat) %in% c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040"))
 metadata2 <- subset(metadata, compartment!= "start") #reldat2 and metadata2 have the t0 data filtered out for pcoa, etc.
+```
 
+##Analyses
+###Principlal coordinates analysis
+```{r}
+#Intitial PCoA with Bray-Curtis dissimilarities to visualize all of the raw data
 pcoa = capscale(reldat2~1,distance = "bray")
 head(summary(pcoa))
 biplot(pcoa)
-pcoa.sites = scores(pcoa,display = "sites") #see loadings, takes awhile
 
 pcoa.sites = as.data.frame(scores(pcoa,display = "sites"))
 
-ggplot(pcoa.sites,aes(x=MDS1,y=MDS2,color=metadata2$compartment,shape=metadata2$Ntreatment)) +
+ggplot(pcoa.sites,aes(x=MDS1,y=MDS2,color=metadata2$Ntreatment,shape=metadata2$compartment)) +
   geom_point(size=8)+
+  #geom_line(aes(group = pot_id), linetype = "dashed") +
   xlab("PCo 1 (18%)") +
-  ylab("PCo 2 (14%)") +
+  ylab("PCo 2 (15%)") +
+  scale_colour_moma_d(name = "Nitrogen addition", palette_name = "Picasso", labels = c("-", "+")) +
+  scale_shape_manual(name = "Subpopulation", values = c(1,19), labels = c("bacteroid", "undifferentiated")) +
   theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
-        panel.border = element_rect(size = 1, colour = "black",fill=NA),
+        panel.border = element_rect(linewidth = 1, colour = "black",fill=NA),
         panel.background = element_rect(fill="white"),
-        axis.text.x=element_text(size=rel(0.9),angle=45,h=1),
-        axis.text.y=element_text(size=rel(0.9))) #initial pcoa assessment to see where the groups fall
+        axis.text.x=element_text(size=rel(0.9)),
+        axis.text.y=element_text(size=rel(0.9))) 
+```
 
-# rarefaction curve
+###Rarefaction curve
+```{r}
+# rarefaction curve is used to look at sequencing efforts
 
 counting <- rowSums(rbdat) #total reads per site/pot
 counting
@@ -57,7 +85,7 @@ Srare <- rarefy(rbdat, raremax)
 Srare #rare genes
 
 labelnames <- data.frame(rownames(rbdat)) #make smaller labels for rarefaction curve 
-shortnames <- str_sub(labelnames$rownames.rbdat., 7, 22)
+shortnames <- substr(labelnames$rownames.rbdat., 7, 22)
 shortnames
 
 cleannames <- gsub('\\.', ' ',shortnames)
@@ -69,7 +97,5 @@ cols <- c("darkred", "darkred", "darkred", "darkred", "forestgreen", "forestgree
 
 rbrar <- rarecurve(rbdat, step = 500, sample = 1000000, xlab = "Total barcodes", ylab = "Unique barcodes", col = cols, cex = 0.5, label = TRUE)
 rbrar
-
 ```
-
 
