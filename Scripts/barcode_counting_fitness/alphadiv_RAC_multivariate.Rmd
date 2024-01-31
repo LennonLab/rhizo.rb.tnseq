@@ -758,15 +758,15 @@ cor_nodNE <- cor(covar_nodNE)
 cor_complete <- cor(covar_complete)
 cor_Nmetabolism <- cor(covar_Nmetab) #correlation matrices for KMO and bartlett tests
 
-KMO(cor_nodES)
-KMO(cor_nodNE)
-KMO(cor_complete)
-KMO(cor_Nmetabolism)
- 
-cortest.bartlett(cor_nodES, n = nrow(cor_nodES))
-cortest.bartlett(cor_nodNE, n = nrow(cor_nodNE))
-cortest.bartlett(cor_complete, n = nrow(cor_complete))
-cortest.bartlett(cor_Nmetabolism, n = nrow(cor_Nmetabolism))
+# KMO(cor_nodES)
+# KMO(cor_nodNE)
+# KMO(cor_complete)
+# KMO(cor_Nmetabolism)
+#  
+# cortest.bartlett(cor_nodES, n = nrow(cor_nodES))
+# cortest.bartlett(cor_nodNE, n = nrow(cor_nodNE))
+# cortest.bartlett(cor_complete, n = nrow(cor_complete))
+# cortest.bartlett(cor_Nmetabolism, n = nrow(cor_Nmetabolism))
 
 
 #PCA of covariance matrices
@@ -798,8 +798,30 @@ covar_scores_Nmetab <- as.data.frame(pca_covar_Nmetab$x[, 1:2])
 
 ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadata$Ntreatment, shape = finalmetadata$compartment)) +
   geom_point(size = 18) +
+  xlim(c(-15,20)) +
+  ylim(c(-15,15)) +
   xlab("PC1 (20%)") +
   ylab("PC2 (17%)") +
+  scale_color_manual(values = c("#D55E00", "#009E73")) +
+  theme_bw(base_size = 30) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_rect(size = 5, colour = "black", fill = NA),
+        panel.background = element_rect(fill = "white"), axis.text.x=element_text(size=rel(1.5)),
+        axis.text.y=element_text(size=rel(1.5)), axis.title.x = element_text(size = 40),
+    axis.title.y = element_text(size = 40),
+        axis.ticks = element_line(size = 3),  # Set the size of tick marks
+    axis.ticks.length = unit(0.4, "cm"),  # Set the length of major ticks
+    axis.ticks.margin = unit(0.8, "cm") 
+    ) +
+  theme(legend.position = "none") #pared down and resized for poster
+
+ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadata$Ntreatment, shape = finalmetadata$compartment)) +
+  geom_point(size = 18) +
+  xlim(c(-15,20)) +
+  ylim(c(-15,15)) +
+  xlab("PC1 (20%)") +
+  ylab("PC2 (17%)") +
+  scale_color_manual(values = c("#D55E00", "#009E73")) +
   theme_bw(base_size = 30) +
   theme(panel.grid = element_blank(),
         panel.border = element_rect(size = 5, colour = "black", fill = NA),
@@ -859,137 +881,6 @@ compare_sym <- protest(pca_covar_nodES, pca_covar_nodNE, permutations=9999)
 compare_sym
 
 plot(compare_sym)
-
-```
-
-
-``` {r Chunk 9: COG analyses}
-
-
-#SUBSET DATA BY COG FOR DOWNSTREAM ANALYSES
-
-
-COGcomplete_conting <- COGcomplete #made a copy of the df so i could work with it without destroying it
-COGnumeric_cols <- which(sapply(COGcomplete_conting, is.numeric)) #creates separate df extracting numeric data from character metadata by applying is.numeric to each element and selecting which() objects pass the test (ie evaluate to TRUE)
-
-for (col in COGnumeric_cols) {
-  COGcomplete_conting[[col]] <- ifelse(COGcomplete_conting[[col]] <= -1, -1,
-                                       ifelse(COGcomplete_conting[[col]] >= 1, 1, 0))
-} #preps data for contingency tables by replacing low fitness values w -1, high ones w 1, neutral w 0; modifies COGcomplete_conting
-
-COGmatrices <- COGcomplete_conting %>%
-  mutate(COGlist = strsplit(COG, "")) %>%
-  unnest(COGlist) %>%
-  mutate(COG = trimws(COGlist)) #expands rows with multiple COGs to create duplicate rows, so that genes get listed under all their COGs
-
-COGlist <- lapply(unique(COGmatrices$COG), function(currCOG) { #obtains list of COGs and runs currCOG for each
-  COG_X <- COGmatrices %>%
-    filter(COG == currCOG) %>%
-    as.data.frame()
-  return(COG_X) #makes df for each unique COG consisting of only all the genes of that COG
-})
-
-for (i in seq_along(COGlist)) {
-  currCOG <- unique(COGlist[[i]]$COG)
-  assign(paste0("COG_", currCOG), COGlist[[i]])
-} #assign each COG_X df to a variable with the corresponding name in GlobalEnv
-
-
-#MAKE CONTINGENCY TABLES
-
-
-COGnames <- ls(pattern = "^COG_")  #only the COG_X dfs are named starting with "COG_"; other objects starting with "COG" have no _
-for (df_name in COGnames) {
-  df <- get(df_name) 
-  df <- df[, c(5, 19:31)] #isolate necessary metadata and remove t0
-  assign(df_name, df, envir = globalenv())
-}
-
-COGnames <- COGnames[! COGnames %in% c('COG_B', 'COG_W')]  #get rid of tables with only 1 gene counted
-
-
-#make stuff for fisher tests
-
-
-for (df_name in COGnames) {
-  df <- get(df_name)
-    negatives <- rowSums(df[, 2:14] == -1)
-  zeros <- rowSums(df[, 2:14] == 0)
-  positives <- rowSums(df[, 2:14] == 1) #total up the frequency of 1s, 0s, and -1s in the fitness values of each df
-  
-  condensed_df <- df %>% 
-    select(essentiality) %>% #divide by essentiality
-    mutate(negative = negatives, neutral = zeros, positive = positives) #replace fitness data with tabulated counts
-    assign(df_name, condensed_df, envir = globalenv()) #updates dfs in global env
-}
-
-COGtables <- vector("character", length = length(COGnames) * 2)  #empty vector to store the table names
-for (i in seq_along(COGnames)) {
-  df_name <- COGnames[i]
-  df <- get(df_name)
-  df_name <- substr(df_name, 1, 5)  #extract "COG_X" name to be assigned to output dfs
-  
-  positive_essential <- sum(df$positive[df$essentiality == "essential"])
-  positive_N <- sum(df$positive[df$essentiality == "N"]) #total up positive column for each category
-  neutral_essential <- sum(df$neutral[df$essentiality == "essential"])
-  neutral_N <- sum(df$neutral[df$essentiality == "N"]) #total up neutral for each category
-  
-  df_positive <- data.frame(
-    positive = c(positive_essential, positive_N) / 13,
-    neutral = c(neutral_essential, neutral_N) / 13
-  )   #create the data frame for COG_X_positive and set row names
-
-  
-  df_positive <- round(df_positive)
-  
-  rownames(df_positive) <- c("essential", "N")   #round the values to the nearest whole number
-  
-  df_positive_name <- paste0(df_name, "_positive")
-  assign(df_positive_name, df_positive, envir = globalenv())   #assign finished COG_X_positive df to global environment
-  
-  COGtables[(i * 2) - 1] <- df_positive_name   #add the name of the data frame to the COGtables list
-  
-  negative_essential <- sum(df$negative[df$essentiality == "essential"])
-  negative_N <- sum(df$negative[df$essentiality == "N"]) #total up negative column for each category
-  neutral_essential <- sum(df$neutral[df$essentiality == "essential"])
-  neutral_N <- sum(df$neutral[df$essentiality == "N"]) #total up neutral column for each category (redundant for organization)
-    
-  df_negative <- data.frame(
-    negative = c(negative_essential, negative_N) / 13,  #divide by 13 because 13 reps
-    neutral = c(neutral_essential, neutral_N) / 13
-  )   #create the data frame for COG_X_negative and set row names
-  
-  df_negative <- round(df_negative)
-  
-  rownames(df_negative) <- c("essential", "N")   #round the values to the nearest whole number
-  
-  df_negative_name <- paste0(df_name, "_negative")
-  assign(df_negative_name, df_negative, envir = globalenv())   #assign finished COG_X_negative df to global environment
-  
-  COGtables[i * 2] <- df_negative_name   #add the name of the data frame to the COGtables list
-} #tabulate and make contingency tables, naming each as an individual df in globalenv
-
-
-#FISHER TESTS
-
-
-for (table_name in COGtables) {
-   df <- get(table_name)
-   result_name <- paste0("fisher_", table_name)
-   assign(result_name, fisher.test(df, simulate.p.value = FALSE))
-}
-
-fisher_tests <- ls(pattern = "fisher_COG", envir = .GlobalEnv)
-
-fisher_pvals <- numeric(length(fisher_tests))
-
-for (j in seq_along(fisher_tests)) {
-  fisher_pvals[j] <- get(fisher_tests[j])$p.value
-} 
-
-names(fisher_pvals) <- gsub("^fisher_", "", fisher_tests)
-
-adjusted_fisher_pvals <- p.adjust(fisher_pvals, method = "fdr")
 
 ```
 
@@ -1437,19 +1328,19 @@ KEGG_geseca_rbtnseq_NE <- geseca(pathways_keggNE, geseca_data, minSize = 1, maxS
 
 #plot fgsea results and create enrichment plots and gsea tables
 
-all_fgsea_cog <- ls(pattern = "fgsea", envir = globalenv()) #find all fgsea results
+all_fgsea_cog <- ls(pattern = "fgsea", envir = globalenv()) 
 
-# for (df_name in all_fgsea_cog) {
-#   df <- get(df_name)
-#   df <- df[!grepl("set-|set_-", df[, 1]), ] #remove unannotated sets from results
-#   assign(df_name, df, envir = .GlobalEnv)
-# } #commenting this out because the unannotated genes might be interesting? idk
+for (df_name in all_fgsea_cog) {
+  df <- get(df_name)
+    df <- df[!grepl("set-|set_-", df[[1]]), ]
+    assign(df_name, df, envir = .GlobalEnv)
+}#gets rid of unannotated result sets
 
 for (fgsea_name in all_fgsea_cog) {
   fgsea_obj <- get(fgsea_name)
-  
+
   switch_value <- fgsea_name
-  
+
   if (fgsea_name %in% c("fgsea_nodN_ES", "fgsea_nodamb_ES", "fgsea_bactN_ES", "fgsea_bactamb_ES")) {
     switch_value <- "ES"
   } else if (fgsea_name %in% c("fgsea_nodN_NE", "fgsea_nodamb_NE", "fgsea_bactN_NE", "fgsea_bactamb_NE")) {
@@ -1459,7 +1350,7 @@ for (fgsea_name in all_fgsea_cog) {
   } else if (fgsea_name %in% c("KEGG_fgsea_nodN_NE", "KEGG_fgsea_nodamb_NE", "KEGG_fgsea_bactN_NE", "KEGG_fgsea_bactamb_NE")) {
     switch_value <- "KEGG_NE"
   } #define naming parameters for each type of result set so that the correct ranking and pathway files can be referenced for each plot
-  
+
   if (switch_value == "ES") {
     pathways_file <- pathways_ES
     ranks_file <- switch(fgsea_name,
@@ -1493,13 +1384,13 @@ for (fgsea_name in all_fgsea_cog) {
       "KEGG_fgsea_bactamb_NE" = bactamb_ranks
     ) #employ switching parameters to use the correct metadata files for each type of result set
   }
-  
+
   topPathwaysUp <- fgsea_obj[ES > 0 & padj < 0.2]
   topPathwaysUp_sorted <- topPathwaysUp[head(order(padj), length(topPathwaysUp)), pathway]
   topPathwaysDown <- fgsea_obj[ES < 0 & padj < 0.2]
   topPathwaysDown_sorted <- c(topPathwaysUp_sorted, rev(topPathwaysDown[head(order(padj), length(topPathwaysDown)), pathway]))
   topPathways <- c(topPathwaysUp_sorted, rev(topPathwaysDown_sorted)) #code adapted from davetang.org; adds most-enriched or -depleted pathways to table
-  
+
   print(plotGseaTable(pathways_file[unique(topPathways)], ranks_file, fgsea_obj, pathwayLabelStyle = list(size=30), headerLabelStyle = list(size=40), valueStyle = list(size=30), axisLabelStyle = list(size=20), gseaParam = 0.15))
   topPathwayEnrich <- head(fgsea_obj[order(pval), ], 1)$pathway
   print(plotEnrichment(pathways_file[[topPathwayEnrich]], ranks_file) + labs(title = topPathwayEnrich)) #print both types of plots
@@ -1644,8 +1535,9 @@ for (gene_id in all_gene_ids) {
 row.names(leadingEdge_allgenes) <- NULL #clean up weird row names
 
 
-#K-S rank-order vs gene order cor tests
+#"Rank-shift" analysis comparing rank-orders between replicates
 
+#prepare data
 split_dfs <- split(rankfitdata, rankfitdata$V1) #splits rank fitness data into treatment groups
 names(split_dfs) <- paste0(names(split_dfs), "_genomeorder")
 split_dfs <- lapply(split_dfs, function(df) df[, -which(names(df) == "V1")]) #deletes extra col
@@ -1666,7 +1558,6 @@ for (i in seq_along(list_of_vectors)) {
 }
 
 genomeorder_dfs <- grep("_genomeorder$", ls(), value = TRUE)
-
 
 genomeorder_replicates <- list()
 
@@ -1705,14 +1596,48 @@ rankorder_replicates <- lapply(rankorder_replicates, t)
 
 genomeorder_replicates <- lapply(genomeorder_replicates, t)
 
-rankshift_test <- cor.test(genomeorder_replicates[["bact_ambient_genomeorder_037"]], rankorder_replicates[["bact_ambient_rankorder_037"]], method = "pearson")
+# rankshift_reference <- rankorder_replicates[["bact_ambient_rankorder_037"]]
+# rankshift_query <- rankorder_replicates[["bact_ambient_rankorder_040"]]
+# 
+# rankshift_crosstreatment <- rankorder_replicates[["bact_fertilized_rankorder_031"]]
+# 
+# rankshift_ct_sorted <- rankshift_crosstreatment[rownames(rankshift_reference), , drop = FALSE]
+# 
+# test_rankshift_comparison <- rankshift_query[rownames(rankshift_reference), , drop = FALSE]
+# 
+# rankshift_test <- cor.test(rankshift_reference, test_rankshift_comparison, method = "pearson")
+# 
+# rankshift_ct_test <- cor.test(rankshift_reference, rankshift_ct_sorted, method = "pearson")
 
-rankshift_test2 <- cor.test(genomeorder_replicates[["bact_ambient_genomeorder_037"]], rankorder_replicates[["bact_ambient_rankorder_040"]], method = "pearson")
+
+rankshift_results <- new.env()
+
+n <- length(rankorder_replicates) #create index variable to facilitate pairwise comparisons
+for (i in seq_len(n)) {
+  for (j in seq_len(n)) {
+    
+    if (i != j && j > i) { #this rule prevents self-comparisons or repeated comparisons
+      
+      query_set <- rankorder_replicates[[i]]
+      reference_set <- rankorder_replicates[[j]] #the two rank-orders to be tested
+      
+      sorted_query_set <- query_set[rownames(reference_set), ] #sort the query set to match the order of the ref
+      
+      correlation_result <- cor.test(sorted_query_set, reference_set, method = "pearson") #cor test
+      
+      result_name <- paste0(substr(names(rankorder_replicates)[i], nchar(names(rankorder_replicates)[i]) - 2, nchar(names(rankorder_replicates)[i])),
+                              "_", substr(names(rankorder_replicates)[j], nchar(names(rankorder_replicates)[j]) - 2, nchar(names(rankorder_replicates)[j]))) #name result based on input datasets
+      
+      assign(result_name, correlation_result, envir = rankshift_results)
+            print(correlation_result) #assign to env and print result
+    }
+  }
+}
 
 
-rankshift_test3 <- cor.test(genomeorder_replicates[["bact_ambient_genomeorder_037"]], genomeorder_replicates[["bact_ambient_genomeorder_040"]])
 
-#NOTE: more code needed to make big cor matrices and run omnibus cor tests assuming we get this weirdness ironed out
+
+
 
 #pSym proportion analysis
 
@@ -1744,6 +1669,108 @@ replicon_table <- matrix(c(symbiotic_plasmid_count, chromosome_count, LE_symcoun
 replicontest <- chisq.test(replicon_table)
 
 replicontest
+
+replicon_table
+
+
+#make individual leading-edge subset tables
+
+#bactamb
+
+all_bactamb <- leadingEdge_extracted[["fgsea_bactamb_ES_leading"]]
+
+#bactN
+
+all_bactN <- unique(c(leadingEdge_extracted[["fgsea_bactN_ES_leading"]], leadingEdge_extracted[["KEGG_fgsea_bactN_ES_leading"]]))
+
+#nodamb
+
+all_nodamb <- leadingEdge_extracted[["fgsea_nodamb_ES_leading"]]
+
+#nodN
+
+all_ES_nodN <- unique(c(leadingEdge_extracted[["fgsea_nodN_ES_leading"]], leadingEdge_extracted[["KEGG_fgsea_nodN_ES_leading"]]))
+
+all_NE_nodN <- leadingEdge_extracted[["KEGG_fgsea_nodN_NE_leading"]]
+
+bact_commongenes <- intersect(all_bactamb, all_bactN)
+bact_commongenes
+
+nod_commongenes <- intersect(all_nodamb, all_ES_nodN)
+nod_commongenes
+
+unique_bactN <-  setdiff(setdiff(all_bactN, c(all_nodamb, all_ES_nodN)), all_bactamb)
+unique_nodamb <- setdiff(setdiff(all_nodamb, all_bactN), all_ES_nodN)
+unique_nodN <- setdiff(c(all_NE_nodN, all_ES_nodN), c(all_bactN, all_nodamb))
+
+
+coresoilgenes <- intersect(all_bactN, intersect(all_nodamb, all_ES_nodN))
+
+all_amb <- unique(c(all_bactamb, all_nodamb))
+#pSym proportion for genes under selection at low N
+
+symbiotic_amb_count <- 0
+chrom_amb_count <- 0
+
+for (gene_name in all_amb) {
+  if (startsWith(gene_name, "SM_") || startsWith(gene_name, "SMa")) {
+    symbiotic_amb_count <- symbiotic_amb_count + 1
+  } else if (startsWith(gene_name, "SMc")) {
+    chrom_amb_count <- chrom_amb_count + 1
+  }
+}
+
+replicon_table_amb <- matrix(c(symbiotic_plasmid_count, chromosome_count, symbiotic_amb_count, chrom_amb_count), nrow = 2, byrow = TRUE)
+replicontest_amb <- chisq.test(replicon_table_amb)
+
+replicontest_amb
+replicon_table_amb
+
+
+
+all_N <- unique(c(all_bactN, all_ES_nodN, all_NE_nodN))
+#pSym proportion for genes under selection at high N
+
+symbiotic_N_count <- 0
+chrom_N_count <- 0
+
+for (gene_name in all_N) {
+  if (startsWith(gene_name, "SM_") || startsWith(gene_name, "SMa")) {
+    symbiotic_N_count <- symbiotic_N_count + 1
+  } else if (startsWith(gene_name, "SMc")) {
+    chrom_N_count <- chrom_N_count + 1
+  }
+}
+
+replicon_table_N <- matrix(c(symbiotic_plasmid_count, chromosome_count, symbiotic_N_count, chrom_N_count), nrow = 2, byrow = TRUE)
+replicontest_N <- chisq.test(replicon_table_N)
+
+replicontest_N
+replicon_table_N
+
+
+
+unique_amb <- setdiff(all_amb, intersect(all_amb, all_N))
+unique_N <- setdiff(all_N, intersect(all_amb, all_N))
+
+
+#bacteroid tables
+bactamb_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% all_bactamb, ]
+unique_bactN_table <- fitmetadata[fitmetadata$locus_tag %in% unique_bactN, ]
+#note that there is no "bacteroid common genes" table because the bactamb subset is entirely contained within bactN, and therefore is the same as the common genes table
+
+#nodule tables
+nodamb_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% unique_nodamb, ]
+nodN_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% unique_nodN, ]
+
+#common genes table
+coresoilgenes_table <- fitmetadata[fitmetadata$locus_tag %in% coresoilgenes, ]
+coresoilgenes_table
+
+#table for all_NE_nodN
+nodN_NE_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% all_NE_nodN, ]
+
+#these were then manually written to CSV files
 
 ```
 
