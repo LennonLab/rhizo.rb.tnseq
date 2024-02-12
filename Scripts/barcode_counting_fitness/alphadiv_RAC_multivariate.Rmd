@@ -1,29 +1,58 @@
 ---
+title: PCoA_relativeabundance_alphadiv_RAC.R
+author: "John McMullen, Caleb Hill"
+date: '2023-04-21'
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
 
+#Libraries required for analyses
+```{r}
+library(vegan)
+library(ggplot2)
+library(stringr)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(tibble)
+library(ggdendro)
+library(fgsea)
+library(coin)
+library(car)
+require("psych")
+```
+
+##Setup data frame
 ```{r Chunk 1: Data wrangling}
 
-fitdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/fit_logratios_clean.tab", row.names = 1)
-#fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
-goodfitdat <- fitdat[, c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45")]
+#The following data is the fitness scores generated from the FEBA pipeline
 #FITNESS SCORE data--log2 ratios of endpoint/starting counts
 
-cleanrbdat = t(read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
-#cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
-goodcountdat <- subset(cleanrbdat, colnames(fitdat) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
-#COUNTS DATA for analyses that can't use log ratio data for whatever reason (negative numbers in data, log scale, etc)
+#fitdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/fit_logratios_clean.tab", row.names = 1)
+fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
+#goodfitdat <- fitdat[, c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45")] #more than 2 million reads
+goodfitdat = fitdat
 
+#COUNT DATA for analyses that can't use log ratio data for whatever reason (negative numbers in data, log scale, etc)
+
+#cleanrbdat = t(read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
+cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
+#goodcountdat <- subset(cleanrbdat, colnames(fitdat) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
+goodcountdat = cleanrbdat
+
+#removes description from column names, leaving only locus id
 newcountnames <- substr(colnames(goodcountdat), 0, 9)
-colnames(goodcountdat) <- newcountnames #removes description from column names, leaving only locus id
+colnames(goodcountdat) <- newcountnames 
 
+#removes trailing characters from SMa ids
 truecountnames <- grep("^SMa", colnames(goodcountdat))
-colnames(goodcountdat)[truecountnames] <- substr(colnames(goodcountdat)[truecountnames], 0, 7) #removes trailing characters from SMa ids
+colnames(goodcountdat)[truecountnames] <- substr(colnames(goodcountdat)[truecountnames], 0, 7) 
 finalcountnames <- grep("^SMc", colnames(goodcountdat))
 colnames(goodcountdat)[finalcountnames] <- gsub("\\s+$", "", colnames(goodcountdat)[finalcountnames]) #ditto for SMc ids
 
+#covert to dataframe
 cleanrbdat <- as.data.frame(cleanrbdat)
 
 rownames(cleanrbdat) <- cleanrbdat$comb
@@ -38,21 +67,6 @@ row.names(goodqual_metadata) <- c("X21", "X22", "X24", "X26", "X27", "X28", "X29
 potlabels <- c("1", "2", "4", "6", "7", "8", "9", "0", "1", "2", "5", "7", "0", "t0", "t0", "t0", "t0", "t0") 
 goodqual_metadata$newID <- potlabels #adds abbreviated treatment/compartment id to the pot numbers
 finalmetadata <- subset(goodqual_metadata, row.names(goodqual_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40")) #filters out t0
-
-library(vegan)
-library(ggplot2)
-library(stringr)
-library(tidyverse)
-library(dplyr)
-library(tidyr)
-library(reshape2)
-library(tibble)
-library(ggdendro)
-library(fgsea)
-library(coin)
-library(car)
-require("psych")
-
 ```
 
 ```{r Chunk 2: Alpha diversity}
@@ -2505,10 +2519,3 @@ replicontest
 
 
 ```
-
----
-title: PCoA_relativeabundance_alphadiv_RAC.R
-author: User
-date: '2023-04-21'
-
----
