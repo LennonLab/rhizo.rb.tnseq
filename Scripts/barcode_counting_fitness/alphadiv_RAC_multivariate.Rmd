@@ -1977,6 +1977,7 @@ replicontest_N <- chisq.test(replicon_table_N)
 replicontest_N
 replicon_table_N
 
+#leading-edge genes present within and unique to each treatment/subpopulation condition
 
 
 unique_amb <- setdiff(all_amb, intersect(all_amb, all_N))
@@ -1995,7 +1996,6 @@ unique_bactN_table <- fitmetadata[fitmetadata$locus_tag %in% unique_bactN, ]
 nodamb_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% unique_nodamb, ]
 nodN_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% unique_nodN, ]
 
-
 #common genes table
 
 coresoilgenes_table <- fitmetadata[fitmetadata$locus_tag %in% coresoilgenes, ]
@@ -2006,10 +2006,10 @@ coresoilgenes_table
 nodN_NE_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% all_NE_nodN, ]
 
 #these were then manually written to CSV files
+
 ```
 
 ```{r Chunk 13: Gene-level ANOVAs}
-
 
 #gene-level type iii anova analysis
 
@@ -2023,38 +2023,40 @@ rownames(ANOVAfitness) <- ANOVAfitness$locus_tag
 ANOVAfitness <- t(ANOVAfitness[, -c(1)])
 
 #define treatment groups
-ANOVAfitness <- data.frame(Ntreatment = c(rep("fertilized",3), rep("ambient",5),rep("fertilized", 3), rep("ambient", 2)), compartment = c(rep("nodule",8), rep("bacteroid",5)), strata = anovastrata, ANOVAfitness)
+ANOVAfitness <- data.frame(Ntreatment = c(rep("fertilized",3), rep("ambient",5),rep("fertilized", 3), rep("ambient", 2)), 
+                            compartment = c(rep("nodule",8), rep("bacteroid",5)),
+                            strata = anovastrata, ANOVAfitness)
 
 #run gene-level anovas on each gene in the genome testing for effects of N treatment and subpopulation
 anovafit_results <- new.env()
+
 for (i in 4:ncol(ANOVAfitness)) { #start here to avoid metadata columns
-  col_name <- colnames(ANOVAfitness)[i]
-
-  formula <- as.formula(paste(col_name, "~ Ntreatment/compartment")) #anova formula
-  anova_result <- Anova(lm(formula, data = ANOVAfitness), type = 'III') #runs anova
-  assign(col_name, anova_result, envir = anovafit_results) #stores in results env
+    col_name <- colnames(ANOVAfitness)[i]
+    formula <- as.formula(paste(col_name, "~ Ntreatment/compartment")) #anova formula
+    anova_result <- Anova(lm(formula, data = ANOVAfitness), type = 'III') #runs anova
+    assign(col_name, anova_result, envir = anovafit_results) #stores in results env
 }
 
-#remove intercept pval for fdr
+#remove intercept pval
 for (obj_name in ls(anovafit_results)) {
-  result <- anovafit_results[[obj_name]]
-  anovafit_results[[obj_name]] <- result[-c(1, nrow(result)), ]
+    result <- anovafit_results[[obj_name]]
+    anovafit_results[[obj_name]] <- result[-c(1, nrow(result)), ]
 }
 
-#extract all p-values from anovafit_results
-all_pvalues <- unlist(lapply(anovafit_results, function(df) df[, 4]))
+# Extract p-values for each factor separately
+ntreatment_pvals <- unlist(lapply(anovafit_results, function(df) df["Ntreatment", "Pr(>F)"]))
+compartment_pvals <- unlist(lapply(anovafit_results, function(df) df["compartment", "Pr(>F)"]))
 
-#perform FDR adjustment on all p-values
-adjusted_pvalues <- p.adjust(all_pvalues, method = "fdr")
+# Perform FDR adjustment on each factor separately
+adjusted_ntreatment_pvals <- p.adjust(ntreatment_pvals, method = "fdr")
+adjusted_compartment_pvals <- p.adjust(compartment_pvals, method = "fdr")
 
-#split adjusted p-values back into separate vectors for each data frame
-start_idx <- 1
+# Update anovafit_results with adjusted p-values
 for (obj_name in ls(anovafit_results)) {
-  result <- anovafit_results[[obj_name]]
-  end_idx <- start_idx + nrow(result) - 1
-  result[, 4] <- adjusted_pvalues[start_idx:end_idx]
-  anovafit_results[[obj_name]] <- result
-  start_idx <- end_idx + 1
+    result <- anovafit_results[[obj_name]]
+    result[result$Term == "Ntreatment", "Pr(>F)"] <- adjusted_ntreatment_pvals
+    result[result$Term == "compartment", "Pr(>F)"] <- adjusted_compartment_pvals
+    anovafit_results[[obj_name]] <- result
 }
 
 #pick out significant results from dataset
@@ -2078,12 +2080,195 @@ significantanova_LE <- intersect(significant_genes, leadingEdge_allgenes[, 1])
 #get info for significant genes
 sig_anova_info <- COGcomplete[COGcomplete[, 1] %in% significant_genes, ]
 
+#test overlap between significant individual genes and leading edge
+LE_anova_overlap <- intersect(sig_anova_info$locus_tag, leadingEdge_allgenes$locus_tag)
+
+
+
+# Create an empty data frame to store the significant LE data
+significant_LE_data <- data.frame()
+
+# Loop through each element of LE_anova_overlap
+for (gene_id in LE_anova_overlap) {
+  # Find the row in sig_anova_info that matches the gene_id
+  matching_row <- sig_anova_info[sig_anova_info$locus_tag == gene_id, ]
+  
+  # If a match is found, append the row to significant_LE_data
+  if (nrow(matching_row) > 0) {
+    significant_LE_data <- rbind(significant_LE_data, matching_row)
+  }
+}
+
+# Add the qval_N and qval_subp columns
+significant_LE_data$qval_N <- NA
+significant_LE_data$qval_subp <- NA
+
+# Loop through each gene in LE_anova_overlap
+for (gene_id in LE_anova_overlap) {
+  # Find the corresponding list in anovafit_significant
+  gene_list <- anovafit_significant[[gene_id]]
+  
+  # Find the row in significant_LE_data that matches the gene_id
+  matching_row <- which(significant_LE_data$locus_tag == gene_id)
+  
+  # Extract the qvalues and assign them to the corresponding columns
+  significant_LE_data$qval_N[matching_row] <- gene_list["Ntreatment", "Pr(>F)"]
+  significant_LE_data$qval_subp[matching_row] <- gene_list["Ntreatment:compartment", "Pr(>F)"]
+}
+
+#get list of significant KEGG pathways to organize table
+
+# Find all objects in the global environment starting with "KEGG_fgsea_"
+all_fgsea_KEGG <- ls(envir = .GlobalEnv, pattern = "^KEGG_fgsea_")
+
+# Create an empty character vector to store significant KEGG pathways
+significant_KEGG_pathways <- character()
+
+# Loop through each object in all_fgsea_KEGG
+for (obj_name in all_fgsea_KEGG) {
+  # Get the corresponding data frame from the global environment
+  df <- get(obj_name, envir = .GlobalEnv)
+  
+  # Find rows where padj <= 0.2
+  significant_rows <- df[df$padj <= 0.2, ]
+  
+  # Extract the "pathway" values from the significant rows
+  significant_pathways <- significant_rows$pathway
+  
+  # Append the significant pathways to the vector
+  significant_KEGG_pathways <- c(significant_KEGG_pathways, significant_pathways)
+}
+
+# Remove the first four characters from each element in significant_KEGG_pathways
+significant_KEGG_pathways <- sub("^set_", "", significant_KEGG_pathways)
+
+# Remove "mapXXXXX" IDs from the "KEGG_Pathway" column in significant_LE_data
+significant_LE_data$KEGG_Pathway <- lapply(significant_LE_data$KEGG_Pathway, function(pathway) {
+  pathway <- unlist(strsplit(pathway, ","))  # Split the pathway string by comma
+  pathway <- trimws(pathway)  # Remove leading/trailing whitespace
+  pathway <- pathway[grep("^ko", pathway)]  # Keep only IDs starting with "ko"
+  pathway
+})
+
+# Remove KEGG IDs not present in significant_KEGG_pathways, but only if there are multiple IDs
+significant_LE_data$KEGG_Pathway <- lapply(significant_LE_data$KEGG_Pathway, function(pathway) {
+  if (length(pathway) > 1) {
+    pathway <- pathway[pathway %in% significant_KEGG_pathways]  # Keep only IDs present in significant_KEGG_pathways
+  }
+  pathway
+})
+
+# Combine the remaining KEGG IDs back into a comma-separated string
+significant_LE_data$KEGG_Pathway <- lapply(significant_LE_data$KEGG_Pathway, function(pathway) {
+  if (length(pathway) == 0) {
+    "-"  # Replace empty cells with a "-" character
+  } else {
+    paste(pathway, collapse = ",")
+  }
+})
+
+significant_LE_data$KEGG_Pathway <- unlist(significant_LE_data$KEGG_Pathway, use.names = FALSE)
+# write.csv(significant_LE_data, "C:/Users/User/Desktop/significant_LE_genes.csv", row.names = FALSE)
 
 ```
 
 ```{r Chunk 14: Tentative graveyard zone}
 
 #here's all the deprecated code, which I'm keeping here both to show my work and in case anything is needed from here
+# 
+# #mulEA (evaluating to replace fgsea with this)
+# 
+# # Get a list of objects ending with "_ranks" in the global environment
+# objects <- ls(pattern = "_ranks$", envir = .GlobalEnv)
+# 
+# # Create a new dataframe for each object with two columns
+# for (obj_name in objects) {
+#   vec <- get(obj_name, envir = .GlobalEnv)
+#   df_name <- paste0(obj_name, "_mulea")
+#   assign(df_name, data.frame(names = names(vec), x = vec))
+# }
+# 
+# 
+# # Install mulea package if not already installed
+# 
+# library(devtools)
+# # install_github("https://github.com/koralgooll/MulEA.git", force = TRUE)
+# require(MulEA)
+# 
+# # Load KEGG pathway gene set collection
+# mulea_keggES <- read_gmt("KEGGsets_ES.gmt")
+# mulea_keggNE <- read_gmt("KEGGsets_NE.gmt")
+# 
+# # Run mulea analysis
+# 
+# 
+# #nodule
+# 
+# #+N ES
+# mulea_N_ES_nod <- gsea(gmt = mulea_keggES,
+#                    element_names = nodN_ranks_mulea$names,
+#                    element_scores = nodN_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_N_ES_nod_results <- run_test(mulea_N_ES_nod)
+# 
+# #--N ES
+# mulea_amb_ES_nod <- gsea(gmt = mulea_keggES,
+#                    element_names = nodamb_ranks_mulea$names,
+#                    element_scores = nodamb_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_amb_ES_nod_results <- run_test(mulea_amb_ES_nod)
+# 
+# 
+# #+N NE
+# mulea_N_NE_nod <- gsea(gmt = mulea_keggNE,
+#                    element_names = nodN_ranks_mulea$names,
+#                    element_scores = nodN_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_N_NE_nod_results <- run_test(mulea_N_NE_nod)
+# 
+# 
+# #--N NE
+# mulea_amb_NE_nod <- gsea(gmt = mulea_keggNE,
+#                    element_names = nodamb_ranks_mulea$names,
+#                    element_scores = nodamb_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_amb_NE_nod_results <- run_test(mulea_amb_NE_nod)
+# 
+# 
+# 
+# #bacteroid
+# 
+# #+N ES
+# mulea_N_ES_bact <- gsea(gmt = mulea_keggES,
+#                    element_names = bactN_ranks_mulea$names,
+#                    element_scores = bactN_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_N_ES_bact_results <- run_test(mulea_N_ES_bact)
+# 
+# #--N ES
+# mulea_amb_ES_bact <- gsea(gmt = mulea_keggES,
+#                    element_names = bactamb_ranks_mulea$names,
+#                    element_scores = bactamb_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_amb_ES_bact_results <- run_test(mulea_amb_ES_bact)
+# 
+# 
+# #+N NE
+# mulea_N_NE_bact <- gsea(gmt = mulea_keggNE,
+#                    element_names = bactN_ranks_mulea$names,
+#                    element_scores = bactN_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_N_NE_bact_results <- run_test(mulea_N_NE_bact)
+# 
+# 
+# #--N NE
+# mulea_amb_NE_bact <- gsea(gmt = mulea_keggNE,
+#                    element_names = bactamb_ranks_mulea$names,
+#                    element_scores = bactamb_ranks_mulea$x,
+#                    number_of_permutations = 10000)
+# mulea_amb_NE_bact_results <- run_test(mulea_amb_NE_bact)
+
+
 
 # NOTE: decided to go with fitness ranking analysis exclusively; leaving this code in for documentation purposes and in case we need to give it a second look. This creates true rank-abundance curves based on the raw counts data rather than fitness ranking curves based off fitness ratios
 
