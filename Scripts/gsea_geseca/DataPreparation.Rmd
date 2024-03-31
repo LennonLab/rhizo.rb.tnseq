@@ -1,0 +1,73 @@
+---
+title: "Data preparation"
+author: "John McMullen"
+date: "2024-03-31"
+output: html_document
+---
+
+This script will setup the data that is needed for the gene sete functional enrichment analysis.
+
+```{r}
+COGmatrices_nodES <- subset(COGmatrices, COGmatrices$essentiality == "essential")
+COGmatrices_nodNE <- subset(COGmatrices, COGmatrices$essentiality == "N") #subset data by essentiality for symbiosis
+
+COGlist_nodES <- lapply(unique(COGmatrices_nodES$COG), function(currCOG) {
+  COG_X_ES <- COGmatrices_nodES %>%
+    filter(COG == currCOG)
+
+  return(COG_X_ES)
+})
+
+COGlist_nodNE <- lapply(unique(COGmatrices_nodNE$COG), function(currCOG) {
+  COG_X_NE <- COGmatrices_nodNE %>%
+    filter(COG == currCOG)
+
+  return(COG_X_NE)
+}) #split COG_matrices into separate dataframes based on COG and symbiotic function
+   #this function and the following were written with the help of ChatGPT to fix the function(curr_cog) syntax as well as the assign() function in the following for loop
+
+for (i in seq_along(COGlist_nodES)) {
+  currCOG <- unique(COGlist_nodES[[i]]$COG)
+  assign(paste0("COG_", currCOG, "_ES"), COGlist_nodES[[i]])
+}
+
+for (i in seq_along(COGlist_nodNE)) {
+  currCOG <- unique(COGlist_nodNE[[i]]$COG)
+  assign(paste0("COG_", currCOG, "_NE"), COGlist_nodNE[[i]])
+} #unlists dfs into separate objects with names COG_X_[gene set]
+
+
+#PULL LOCUS IDS FROM EACH COG_X_[set] DF INTO VECTORS TO MAKE PATHWAYS.GMT FOR FGSEA
+
+
+genesetsCOG_ES <- lapply(seq_along(COGlist_nodES), function(i) {
+  df <- COGlist_nodES[[i]]
+  first_col <- as.character(df[[1]])
+  vector_name <- paste0("set", unique(df[[4]]))
+  names(first_col) <- NULL
+  names <- setNames(list(first_col), vector_name)
+  return(names)
+}) #rearranges COG information into a list of vectors to be fed into fgsea functions to build pathways file
+genesetsCOG_ES <- unlist(genesetsCOG_ES, recursive = FALSE) #final format
+
+genesetsCOG_NE <- lapply(seq_along(COGlist_nodNE), function(i) {
+  df <- COGlist_nodNE[[i]]
+  first_col <- as.character(df[[1]])
+  vector_name <- paste0("set", unique(df[[4]]))
+  names(first_col) <- NULL
+  names <- setNames(list(first_col), vector_name)
+  return(names)
+})
+genesetsCOG_NE <- unlist(genesetsCOG_NE, recursive = FALSE)
+
+
+#WRITE PATHWAY FILES AND DECLARE AS VARIABLES
+
+
+writeGmtPathways(genesetsCOG_ES, tempfile("COGsets_ES", fileext = ".gmt")) #creates file in user/appdata/local/temp/[random id] dir which must be manually retrieved, also includes like a hexadecimal id (or maybe it's just random numbers and letters?) which I deleted
+
+writeGmtPathways(genesetsCOG_NE, tempfile("COGsets_NE", fileext = ".gmt"))
+
+
+```
+
