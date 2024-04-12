@@ -1,137 +1,102 @@
 ---
+title: "alphadiv_RAC_multivariate"
+author: "Caleb Hill, John McMullen"
+date: "2024-02-12"
 output: html_document
-editor_options: 
-  chunk_output_type: console
 ---
 
+##Libraries required for analyses
+```{r}
+library(vegan) #multivariate analyses
+library(stringr) #Data wrangling
+library(tidyverse) #Data wrangling
+library(ggdendro) #Tree drawing for cluster dendrogram
+library(fgsea) #gene enrichment
+library(coin)
+library(car) #ANOVAs
+require("psych") #model assessment for PCAs
+```
+
+##Data
 ```{r Chunk 1: Data wrangling}
-
-
 #FITNESS SCORE data--log2 ratios of endpoint/starting counts
-
-fitdat = read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/fit_logratios_clean.tab", row.names = 1)
-#fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
-goodfitdat <- fitdat[, c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45")]
+fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
+goodfitdat <- fitdat
 
 
-#COUNTS DATA for analyses that can't use log ratio data for whatever reason (negative numbers in data, log scale, etc)
+#COUNTS DATA for analyses that can't use log ratio data for whatever reason (negative numbers in data, etc)
+cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
+goodcountdat <- cleanrbdat
 
-cleanrbdat = t(read.delim("C:/Users/User/Desktop/thesis_stuff/R_working/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
-#cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
-goodcountdat <- subset(cleanrbdat, colnames(fitdat) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45"))
+#META DATA that includes subpopulation and nitrogen treatment
+metadat = read.csv(file = "~/GitHub/rhizo.rb.tnseq/Data/smeliplant_metadata_plant_seq.csv")
+#remove rows for sample id 25, 34, 36, and 38; reads were < 500,000
+metadat = metadat %>% filter(Barseq_Index != "IT025" & Barseq_Index != "IT034" & Barseq_Index != "IT036" & Barseq_Index != "IT038")
+```
 
+##Setup dataframes for downstream analyses
+###Count data
+```{r}
 #remove description from column names, leaving only locus id
 newcountnames <- substr(colnames(goodcountdat), 0, 9)
 colnames(goodcountdat) <- newcountnames 
-
-#removes trailing characters from SMa ids
-truecountnames <- grep("^SMa", colnames(goodcountdat))
-colnames(goodcountdat)[truecountnames] <- substr(colnames(goodcountdat)[truecountnames], 0, 7) 
-
-#ditto for SMc ids
-finalcountnames <- grep("^SMc", colnames(goodcountdat))
-colnames(goodcountdat)[finalcountnames] <- gsub("\\s+$", "", colnames(goodcountdat)[finalcountnames]) 
-cleanrbdat <- as.data.frame(cleanrbdat)
-
-#clean up and labels data by treatment/compartment
-rownames(cleanrbdat) <- cleanrbdat$comb
-cleanrbdat = t(cleanrbdat[,-c(1:4)])
-metadata = as.data.frame(matrix(ncol=2,nrow=18))
-metadata[,1] <-c(rep("nod",8),rep("bact",5),rep("start",5))
-metadata[,2] <-c(rep("fertilized",3),rep("ambient",5),rep("fertilized",3),rep("ambient",2),rep("time0",5))
-colnames(metadata) <- c("compartment","Ntreatment")  
-
-#add numerical IDs to metadata df
-goodqual_metadata <- metadata
-row.names(goodqual_metadata) <- c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40", "X41", "X42", "X43", "X44", "X45") 
-potlabels <- c("1", "2", "4", "6", "7", "8", "9", "0", "1", "2", "5", "7", "0", "t0", "t0", "t0", "t0", "t0") 
-#add abbreviated treatment/compartment id to the pot numbers
-goodqual_metadata$newID <- potlabels 
-finalmetadata <- subset(goodqual_metadata, row.names(goodqual_metadata) %in% c("X21", "X22", "X24", "X26", "X27", "X28", "X29", "X30", "X31", "X32", "X35", "X37", "X40")) #filters out t0
+goodcountdat <- as.data.frame(goodcountdat)
 
 
-#various libraries needed for subsequent analyses
-library(vegan)
-library(ggplot2)
-library(stringr)
-library(tidyverse)
-library(dplyr)
-library(tidyr)
-library(reshape2)
-library(tibble)
-library(ggdendro)
-library(fgsea)
-library(coin)
-library(car)
-require("psych")
+#clean up and labels data by treatment/compartment from the meta; remove the t0
+goodcountdat = goodcountdat %>% 
+  mutate(Subpop = metadat$Subpop) %>% 
+  mutate(Nitrogen = metadat$Nitrogen_addition) %>% 
+  mutate(plant_ID = metadat$plantID) %>% 
+  filter(Subpop != "t0")
 ```
 
+
+##Diversity analyses
+###Setup dataframe for indices
 ```{r Chunk 2: Alpha diversity}
+#SHANNON DIVERSITY to compare richness and evenness among samples
+#Continuous measure
+diversity.fit <- diversity(goodcountdat[,1:5175],MARGIN = 1,index = "shannon")%>% 
+  as.data.frame() %>%
+  mutate(Subpop = goodcountdat$Subpop) %>% 
+  mutate(Nitrogen = goodcountdat$Nitrogen) %>% 
+  mutate(plant_ID = goodcountdat$plant_ID) %>%
+  rename(shannon = ".")  %>%
+  select("plant_ID","Nitrogen","Subpop","shannon")
 
 
-
- #SHANNON DIVERSITY of lib
-
-shannonfit <- numeric(nrow(goodcountdat))
-for(j in 1:nrow(goodcountdat)) {
-  shannonfit[j] <- vegan::diversity(goodcountdat[j,], index = "shannon")
-}
-
-shannonfit
-
-#S&W EVENNESS of lib in each pot
-
-#function calculating SMITH AND WILSON'S EVENNESS INDEX for the given site
-Evar <- function(x) {
-  x <- as.vector(x[x > 0])
-  1 - (2/pi)*atan(var(log(x)))
+#NORMALIZED MEDIAN EVENNESS to compare the evenness across samples with relative abundance data
+#Propotional measure
+#citation: https://journals.asm.org/doi/10.1128/msphere.01019-20
+#function
+NME <- function(x) {
+  y = x[x>0]
+  tmp = y * -log(y)
+  return(median(tmp)/max(tmp))
 } 
 
-Evarfit <- numeric(nrow(goodcountdat))
-for(j in 1:nrow(goodcountdat)) {
-  Evarfit[j] <- Evar(goodcountdat[j,])
-}
+diversity.fit$NME <- apply(decostand(goodcountdat[,1:5175],method = "total"),MARGIN = 1, FUN = NME)
 
-Evarfit 
-
-#RICHNESS AND % FOUND
-
-#function which returns the % OF SPECIES FOUND in each site
-countzeros <- function(row) {
+#PROPORTION FOUND of total barcodes sequenced in each treatment
+#proportional measure
+#function which returns the % OF BARCODES FOUND in each site; all columns represent all of the barcodes sequenced in the sample
+recovered <- function(row) {
   numzeros <- sum(row == 0)
-  percentzeros <- 100 - (numzeros / length(row) * 100)
-  return(percentzeros)
+  prop_not_zero <- 1 - (numzeros / length(row))
+  return(prop_not_zero)
 } 
 
-#calculates % found for each row (site)
-percentfoundfit <- apply(goodcountdat, 1, countzeros) 
-percentfoundfit
+diversity.fit$recovered <- apply(goodcountdat[,1:5175], MARGIN = 1, FUN = recovered)
 
-#function which returns OBSERVED SPECIES RICHNESS in a given site
-S_obs <- function(x = ""){
-  rowSums(x>0)*1
-} 
+#RICHNESS for the number of barcodes found in each sample
+#count measure
+diversity.fit$richness <- specnumber(goodcountdat[,1:5175])
+```
 
-#SPECIES (ie, gene/deletion mutant) RICHNESS
-richnessfit <-  S_obs(goodcountdat)
-richnessfit
-
-#final collated dataframe of alpha diversity measures by pot
-alphadiversitylib = as.data.frame(matrix(ncol=4,nrow=nrow(goodcountdat)))
-colnames(alphadiversitylib) <- c('Shannon','SW_Evenness','percentFound','Richness')
-rownames(alphadiversitylib) <- rownames(goodcountdat)
-alphadiversitylib[,1] <- shannonfit
-alphadiversitylib[,2] <- Evarfit
-alphadiversitylib[,3] <- percentfoundfit
-alphadiversitylib[,4] <- richnessfit
-alphadiversitylib 
-alphadivnames <- c("21 Nod +N", "22 Nod +N", "24 Nod +N", "26 Nod -N", "27 Nod -N", "28 Nod -N", "29 Nod -N", "30 Nod -N", "31 Bact +N", "32 Bact +N", "35 Bact +N", "37 Bact -N", "40 Bact -N", "t0 1", "t0 2", "t0 3", "t0 4", "t0 5")
-rownames(alphadiversitylib) <- alphadivnames
-
-
+###Comparison among treatments for each diversity index
+```{r}
 #Statistical analysis of alphadiv data
-
-alphadiversitylib$group <- c("nod +N", "nod +N", "nod +N", "nod ambient", "nod ambient", "nod ambient", "nod ambient", "nod ambient", "bact +N", "bact +N", "bact +N", "bact ambient", "bact ambient", "t0", "t0", "t0", "t0", "t0")
 
 #grouped and meaned for reporting mean and SE
 alphadiv_anova_data <- alphadiversitylib %>%
@@ -809,9 +774,6 @@ rownames(fitrank_Nmetab) <- row_names_Nmetab
 ```
 
 ```{r Chunk 7: Covariance PCA + plots}
-
-
-
 #correlation matrices for KMO and bartlett tests
 cor_nodES <- cor(covar_nodES)
 cor_nodNE <- cor(covar_nodNE)
@@ -945,70 +907,6 @@ plot(compare_sym)
 ```
 
 ``` {r Chunk 8: fgsea and geseca for COGs}
-
-#code is commented out if its only purpose is to build input files, as these only need to be run once
-# 
-# COGmatrices_nodES <- subset(COGmatrices, COGmatrices$essentiality == "essential")
-# COGmatrices_nodNE <- subset(COGmatrices, COGmatrices$essentiality == "N") #subset data by essentiality for symbiosis
-# 
-# COGlist_nodES <- lapply(unique(COGmatrices_nodES$COG), function(currCOG) {
-#   COG_X_ES <- COGmatrices_nodES %>%
-#     filter(COG == currCOG)
-# 
-#   return(COG_X_ES)
-# })
-# 
-# COGlist_nodNE <- lapply(unique(COGmatrices_nodNE$COG), function(currCOG) {
-#   COG_X_NE <- COGmatrices_nodNE %>%
-#     filter(COG == currCOG)
-# 
-#   return(COG_X_NE)
-# }) #split COG_matrices into separate dataframes based on COG and symbiotic function
-#    #this function and the following were written with the help of ChatGPT to fix the function(curr_cog) syntax as well as the assign() function in the following for loop
-# 
-# for (i in seq_along(COGlist_nodES)) {
-#   currCOG <- unique(COGlist_nodES[[i]]$COG)
-#   assign(paste0("COG_", currCOG, "_ES"), COGlist_nodES[[i]])
-# }
-# 
-# for (i in seq_along(COGlist_nodNE)) {
-#   currCOG <- unique(COGlist_nodNE[[i]]$COG)
-#   assign(paste0("COG_", currCOG, "_NE"), COGlist_nodNE[[i]])
-# } #unlists dfs into separate objects with names COG_X_[gene set]
-#  
-# 
-# #PULL LOCUS IDS FROM EACH COG_X_[set] DF INTO VECTORS TO MAKE PATHWAYS.GMT FOR FGSEA
-# 
-# 
-# genesetsCOG_ES <- lapply(seq_along(COGlist_nodES), function(i) {
-#   df <- COGlist_nodES[[i]]
-#   first_col <- as.character(df[[1]])
-#   vector_name <- paste0("set", unique(df[[4]]))
-#   names(first_col) <- NULL
-#   names <- setNames(list(first_col), vector_name)
-#   return(names)
-# }) #rearranges COG information into a list of vectors to be fed into fgsea functions to build pathways file
-# genesetsCOG_ES <- unlist(genesetsCOG_ES, recursive = FALSE) #final format
-# 
-# genesetsCOG_NE <- lapply(seq_along(COGlist_nodNE), function(i) {
-#   df <- COGlist_nodNE[[i]]
-#   first_col <- as.character(df[[1]])
-#   vector_name <- paste0("set", unique(df[[4]]))
-#   names(first_col) <- NULL
-#   names <- setNames(list(first_col), vector_name)
-#   return(names)
-# })
-# genesetsCOG_NE <- unlist(genesetsCOG_NE, recursive = FALSE)
-# 
-# 
-# #WRITE PATHWAY FILES AND DECLARE AS VARIABLES
-# 
-# 
-# writeGmtPathways(genesetsCOG_ES, tempfile("COGsets_ES", fileext = ".gmt")) #creates file in user/appdata/local/temp/[random id] dir which must be manually retrieved, also includes like a hexadecimal id (or maybe it's just random numbers and letters?) which I deleted
-# 
-# writeGmtPathways(genesetsCOG_NE, tempfile("COGsets_NE", fileext = ".gmt"))
-
-
 #I added these renamed files to my R working directory
 pathways_ES <- gmtPathways("COGsets_ES.gmt") 
 pathways_NE <- gmtPathways("COGsets_NE.gmt")
@@ -3023,10 +2921,3 @@ significant_LE_data$KEGG_Pathway <- unlist(significant_LE_data$KEGG_Pathway, use
 
 
 ```
-
----
-title: PCoA_relativeabundance_alphadiv_RAC.R
-author: User
-date: '2023-04-21'
-
----
