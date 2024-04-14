@@ -5,6 +5,7 @@ date: "2024-02-12"
 output: html_document
 ---
 
+
 ##Libraries required for analyses
 ```{r}
 library(vegan) #multivariate analyses
@@ -17,22 +18,24 @@ library(car) #ANOVAs
 require("psych") #model assessment for PCAs
 ```
 
+
 ##Data
 ```{r Chunk 1: Data wrangling}
+
 #FITNESS SCORE data--log2 ratios of endpoint/starting counts
 fitdat = read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/fit_logratios.tab", row.names = 1)
 goodfitdat <- fitdat
-
 
 #COUNTS DATA for analyses that can't use log ratio data for whatever reason (negative numbers in data, etc)
 cleanrbdat = t(read.delim("~/GitHub/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/gene_counts_clean.tab", row.names = 1))
 goodcountdat <- cleanrbdat
 
-#META DATA that includes subpopulation and nitrogen treatment
+#METADATA that includes subpopulation and nitrogen treatment
 metadat = read.csv(file = "~/GitHub/rhizo.rb.tnseq/Data/smeliplant_metadata_plant_seq.csv")
 #remove rows for sample id 25, 34, 36, and 38; reads were < 500,000
 metadat = metadat %>% filter(Barseq_Index != "IT025" & Barseq_Index != "IT034" & Barseq_Index != "IT036" & Barseq_Index != "IT038")
 ```
+
 
 ##Setup dataframes for downstream analyses
 ###Count data
@@ -94,101 +97,76 @@ diversity.fit$recovered <- apply(goodcountdat[,1:5175], MARGIN = 1, FUN = recove
 diversity.fit$richness <- specnumber(goodcountdat[,1:5175])
 ```
 
+
 ###Comparison among treatments for each diversity index
 ```{r}
 #Statistical analysis of alphadiv data
 
 #grouped and meaned for reporting mean and SE
-alphadiv_anova_data <- alphadiversitylib %>%
-  group_by(group) %>%
-  summarize(Mean_Shannon = mean(Shannon),
-    SE_Shannon = sd(Shannon) / sqrt(n()),
-    Mean_SWEvenness = mean(SW_Evenness),
-    SE_Evenness = sd(SW_Evenness) / sqrt(n()),
-    Mean_percentFound = mean(percentFound),
-    SE_percentFound = sd(percentFound) / sqrt(n()),
-    Mean_Richness = mean(Richness),
-    SE_Richness = sd(Richness) / sqrt(n())
+diversityfit_anova_data <- diversity.fit %>%
+  group_by(Nitrogen, Subpop) %>%
+  summarize(Mean_Shannon = mean(shannon),
+    SE_Shannon = sd(shannon) / sqrt(n()),
+    Mean_NME = mean(NME),
+    SE_NME = sd(NME) / sqrt(n()),
+    Mean_recovered = mean(recovered),
+    SE_recovered = sd(recovered) / sqrt(n()),
+    Mean_Richness = mean(richness),
+    SE_Richness = sd(richness) / sqrt(n())
   ) 
 
-alphadiv_onlyresponse <- head(alphadiversitylib, -5)
-new_order <- c(ncol(alphadiversitylib), 1:(ncol(alphadiversitylib) - 1))
-alphadiversitylib <- alphadiversitylib[, new_order]
+#kruskal tests to determine if biodiversity measures vary significantly by group
 
+#join Ntreatment and Subpop into single group id for kruskal tests
+diversity.fit <- diversity.fit %>%
+  mutate(group = paste(Nitrogen, Subpop, sep = "_")) 
 
-#bartlett and shapiro tests, and Welch's anovas to test unbalanced alphadiv data
+kruskal.test(shannon ~ group, data = diversity.fit)
+kruskal.test(NME ~ group, data = diversity.fit)
+kruskal.test(richness ~ group, data = diversity.fit)
 
-bartlett.test(Shannon ~ group, data = alphadiversitylib)
-bartlett.test(SW_Evenness ~ group, data = alphadiversitylib)
-bartlett.test(percentFound ~ group, data = alphadiversitylib)
-bartlett.test(Richness ~ group, data = alphadiversitylib)
-
-shapiro.test(alphadiversitylib$Shannon)
-shapiro.test(alphadiversitylib$SW_Evenness)
-shapiro.test(alphadiversitylib$percentFound)
-shapiro.test(alphadiversitylib$Richness)
-
-kruskal.test(Shannon ~ group, data = alphadiv_onlyresponse)
-kruskal.test(SW_Evenness ~ group, data = alphadiv_onlyresponse)
-kruskal.test(percentFound ~ group, data = alphadiv_onlyresponse)
-kruskal.test(Richness ~ group, data = alphadiv_onlyresponse)
-
-kruskal_pvals <- c(0.8807, 0.8698, 0.1438, 0.1438)
+kruskal_pvals <- c(0.9827, 0.744, 0.08317)
 
 kruskal_q <- p.adjust(kruskal_pvals, method = "fdr")
 ```
 
-```{r Chunk 3: Resemblance matrices}
 
+##Read in metadata for S. meliloti genome
+###Create resemblance matrices for downstream analyses
+```{r Chunk 3: Resemblance matrices}
 
 #fitmetadata describes genes in detail--locus id, name, cog category, description, essentiality for nodulation, etc etc. 
 
 fitmetadata <- read.csv("C:/Users/User/Desktop/analyze_Nfitness/smeliplant_neutral_cog_clean.csv")
 #fitmetadata <- read.csv("~/Github/rhizo.rb.tnseq/Scripts/reciprocal_BLAST_essentiality/rbh_essentiality_supplies/smeliplant_neutral_cog_clean.csv")
 
+#to subset N metabolism genes, a blastKOALA annotation was conducted and N metabolism genes pulled from the KEGG reconstruction
+nitrogengenes <- read.delim("C:/Users/User/Desktop/blastkoala_annotation_smeli.txt", header=FALSE)
+#nitrogengenes <- read.delim("~/Github/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/blastkoala_annotation_smeli.txt", header=FALSE)
+
+
 #clean up empty col, remove description info from labels
 fitmetadata <- fitmetadata[, -c(1)]
-newnamesfitrel <- substr(row.names(goodfitdat), 0, 9) 
-newnamesfitrel
+newnamesfitrel <- trimws(row.names(goodfitdat))
 row.names(goodfitdat) <- newnamesfitrel 
-
-#remove trailing space and letter from SMa names
-truenames <- grep("^SMa", row.names(goodfitdat)) 
-row.names(goodfitdat)[truenames] <- substr(row.names(goodfitdat)[truenames], 0, 7) 
-
-#remove trailing space from SMc names
-truefitnames <- grep("^SMc", row.names(goodfitdat)) 
-row.names(goodfitdat)[truefitnames] <- gsub("\\s+$", "", row.names(goodfitdat)[truefitnames])  
+nitrogengenes$V1 <- trimws(nitrogengenes$V1)
 
 #fitness data subsetted into groups of interest
 completefit <- merge(fitmetadata, goodfitdat, by.x = 1, by.y = 0)
 nodESfit <- subset(completefit, essentiality=="essential")
 nodNEfit <- subset(completefit, essentiality=="N") 
 
-#to subset N metabolism genes, a blastKOALA annotation was conducted and N metabolism genes pulled from the KEGG reconstruction
-nitrogengenes <- read.delim("C:/Users/User/Desktop/blastkoala_annotation_smeli.txt", header=FALSE)
-#nitrogengenes <- read.delim("~/Github/rhizo.rb.tnseq/Data/fitness_data/html/SmeliPlant/blastkoala_annotation_smeli.txt", header=FALSE)
-
-#same name-cleaning process as above; I wrote these before I knew about trimws()
-nitrogengenes$V1 <- substr(nitrogengenes$V1, 7, 15)
-Nnames <- grep("^SMa", nitrogengenes$V1)
-nitrogengenes$V1[Nnames] <- substr((nitrogengenes$V1)[Nnames], 0, 7)
-nitronames <- grep("^SMc", nitrogengenes$V1) 
-nitrogengenes$V1[nitronames] <- gsub("\\s+$", "", nitrogengenes$V1[nitronames]) 
-
 #these gene IDs are from Nmetabolismlist.txt, which is sourced from blastKOALA output
 metabloci <- c("SMa0228", "SMc04028", "SMc04026", "SMa1250", "SM_b20986", "SMa1182", "SMc02150", "SMa0697", "SMc04083", "SMa0045", "SMc02613", "SMc00762", "SMc00948", "SMc01594", "SMc01973", "SMc02352", "SM_b20745", "SMa1276", "SMa1236", "SMa1233", "SM_b20436", "SMa0827", "SMa0825", "SMa0829", "SMa1273", "SMc04085", "SMa0585", "SMa0583", "SMa0581", "SM_b20985", "SM_b20984") 
 
 #N metabolism fitness subset
-Nmetabolism <- subset(nitrogengenes, V1 %in% metabloci)
-Nmetabolismfit <- subset(completefit, completefit$locus_tag %in% Nmetabolism$V1) 
+Nmetabolismfit <- subset(completefit, completefit$locus_tag %in% metabloci) 
 
 #save a version of the matrices which preserves metadata to be subsetted by COG in later analyses
 COGnodES <- nodESfit
 COGnodNE <- nodNEfit
 COGcomplete <- completefit
 COGNmetabolism <- Nmetabolismfit 
-
 #KEGG df clones to preserve metadata for later
 KEGGnodES <- nodESfit
 KEGGnodNE <- nodNEfit
@@ -196,10 +174,10 @@ KEGGcomplete <- completefit
 KEGGNmetabolism <- Nmetabolismfit 
 
 #remove metadata from subsetted groups to get only the numerical data in the frame itself
-nodESfit <- nodESfit[, -c(2:18)]
-nodNEfit <- nodNEfit[, -c(2:18)]
-completefit <- completefit[, -c(2:18)]
-Nmetabolismfit <- Nmetabolismfit[, -c(2:18)] 
+nodESfit <- nodESfit[, -c(2:20)]
+nodNEfit <- nodNEfit[, -c(2:20)]
+completefit <- completefit[, -c(2:20)]
+Nmetabolismfit <- Nmetabolismfit[, -c(2:20)] 
 
 #update names and deletes extra row
 row.names(nodESfit) <- nodESfit[,1]
@@ -218,6 +196,8 @@ completefit <- t(completefit)
 Nmetabolismfit <- t(Nmetabolismfit) 
 
 #relabel pots to include pot number and treatment/compartment info all in one
+potlabels <- c("1_nodN", "2_nodN", "3_nodN", "4_nodN", "6_nodamb", "7_nodamb", "8_nodamb", "9_nodamb", "0_nodamb", "1_bactN", "2_bactN", "3_bactN", "5_bactN", "7_bactamb", "9_bactamb", "0_bactamb", "t0", "t0", "t0", "t0", "t0") 
+
 row.names(nodESfit) <- potlabels
 row.names(nodNEfit) <- potlabels
 row.names(completefit) <- potlabels
@@ -248,23 +228,25 @@ finalscaled_complete <- as.data.frame(scaled_complete[1:(nrow(scaled_complete) -
 finalscaled_Nmetabolism <- as.data.frame(scaled_Nmetabolism[1:(nrow(scaled_Nmetabolism) - 5),]) 
 ```
 
-```{r Chunk 4: unscaled PERMANOVAs}
+##PERMANOVA analyses testing for effects of nitrogen treatment and subpopulation on gene-level fitness
+```{r Chunk 4: PERMANOVAs}
 
-
-#remove t0 from original, unscaled dfs
+#remove t0 from original dfs
 covar_nodES <- as.data.frame(nodESfit[1:(nrow(scaled_nodES) - 5),])
 covar_nodNE <- as.data.frame(nodNEfit[1:(nrow(scaled_nodES) - 5),])
 covar_complete <- as.data.frame(completefit[1:(nrow(scaled_nodES) - 5),])
 covar_Nmetab <- as.data.frame(Nmetabolismfit[1:(nrow(scaled_nodES) - 5),]) 
+finalmetadat <- metadat[-c((nrow(metadat) - 4):nrow(metadat)), ]
 
-#unscaled PERMANOVA with FDR adjustment
-nodES_covar_permanova <- adonis2(covar_nodES ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_nodES, permutations = 9999, method="euclidean")
 
-nodNE_covar_permanova <- adonis2(covar_nodNE ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_nodNE, permutations = 9999, method="euclidean")
+#PERMANOVA with FDR adjustment
+nodES_covar_permanova <- adonis2(covar_nodES ~ finalmetadat$Nitrogen_addition/finalmetadat$Subpop + finalmetadat$plantID, data = covar_nodES, permutations = 9999, method="euclidean")
 
-complete_covar_permanova <- adonis2(covar_complete ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_complete, permutations = 9999, method="euclidean")
+nodNE_covar_permanova <- adonis2(covar_nodNE ~ finalmetadat$Nitrogen_addition/finalmetadat$Subpop + finalmetadat$plantID, data = covar_nodNE, permutations = 9999, method="euclidean")
 
-Nmetab_covar_permanova <- adonis2(covar_Nmetab ~ finalmetadata$Ntreatment/finalmetadata$compartment + finalmetadata$newID, data = covar_Nmetab, permutations = 9999,  method="euclidean")
+complete_covar_permanova <- adonis2(covar_complete ~ finalmetadat$Nitrogen_addition/finalmetadat$Subpop + finalmetadat$plantID, data = covar_complete, permutations = 9999, method="euclidean")
+
+Nmetab_covar_permanova <- adonis2(covar_Nmetab ~ finalmetadat$Nitrogen_addition/finalmetadat$Subpop + finalmetadat$plantID, data = covar_Nmetab, permutations = 9999,  method="euclidean")
 
 nodES_covar_permanova
 nodNE_covar_permanova
@@ -276,7 +258,6 @@ covar_permanova_pvals <- na.omit(covar_permanova_pvals)
 
 adjusted_covarpermanova_pvals <- p.adjust(covar_permanova_pvals, method = "fdr")
 allcovar_permanova <- ls(pattern = "_covar_permanova$")
-
 
 #make tables to individually report statistics for each pca plot
 results_list <- list()
@@ -301,31 +282,8 @@ for (i in 1:length(allcovar_permanova)) {
 }
 ```
 
-
-```{r Chunk 5: Ward's clustering}
-
-#quick and easy clustering plots for each genome partition for each pot
-ward_nodES <- hclust(dissim_nodES, method = "ward.D2")
-ward_nodNE <- hclust(dissim_nodNE, method = "ward.D2")
-ward_complete <- hclust(dissim_complete, method = "ward.D2") 
-ward_Nmetabolism <- hclust(dissim_Nmetabolism, method = "ward.D2")
-
-wardlabels <- paste(goodqual_metadata$compartment, goodqual_metadata$Ntreatment, sep = "_")
-wardlabels <- as.data.frame(wardlabels)
-row.names(wardlabels) <- row.names(goodqual_metadata)
-wardlabels$potID <- c("1_", "2_", "4_", "6_", "7_", "8_", "9_", "10_", "1_", "2_",  "5_", "7_", "10_", "1_", "2_", "3_", "4_", "5_")
-wardlabels <- paste(wardlabels$potID, wardlabels$wardlabels, sep = "")
-
-par(mar = c(1, 5, 2, 2) + 0.1)
-plot(ward_nodES, main = "Ward's Clustering of sites by essential nodulation gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
-plot(ward_nodNE, main = "Ward's Clustering of sites by nonessential nodulation gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
-plot(ward_complete, main = "Ward's Clustering of sites by whole-genome fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
-plot(ward_Nmetabolism, main = "Ward's Clustering of sites by N metabolism gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
-
-
-``` 
-
-```{r Chunk 6: Ranked fitness, K-S, Rank-order correlation tests}
+##Generate gene fitness rankings and conduct Spearman correlation tests on ranking
+```{r Chunk 5: Ranked fitness, K-S, Rank-order correlation tests}
 
 
 #set up row names and such to be merged and unmerged
@@ -772,6 +730,7 @@ rownames(fitrank_complete) <- row_names_complete
 fitrank_Nmetab <- ks_results_table[c("ks_amb_compartment_Nmetab_fit", "ks_bacteroid_Nmetab_fit", "ks_fert_compartment_Nmetab_fit", "ks_nodule_Nmetab_fit"), ]
 rownames(fitrank_Nmetab) <- row_names_Nmetab 
 ```
+
 
 ```{r Chunk 7: Covariance PCA + plots}
 #correlation matrices for KMO and bartlett tests
@@ -2073,6 +2032,35 @@ significant_LE_data$KEGG_Pathway <- unlist(significant_LE_data$KEGG_Pathway, use
 ```{r Chunk 14: Tentative graveyard zone}
 
 #here's all the deprecated code, which I'm keeping here both to show my work and in case anything is needed from here
+
+
+
+
+#Ward's clustering plots (used to get a preliminary sense of the clustering of replicates before in-depth analyses)
+
+
+# ##Ward's clustering plots to quickly visualize variation between replicates for each partition of the genome
+# 
+# 
+# #quick and easy clustering plots for each genome partition for each pot
+# ward_nodES <- hclust(dissim_nodES, method = "ward.D2")
+# ward_nodNE <- hclust(dissim_nodNE, method = "ward.D2")
+# ward_complete <- hclust(dissim_complete, method = "ward.D2") 
+# ward_Nmetabolism <- hclust(dissim_Nmetabolism, method = "ward.D2")
+# 
+# wardlabels <- paste(goodqual_metadata$compartment, goodqual_metadata$Ntreatment, sep = "_")
+# wardlabels <- as.data.frame(wardlabels)
+# row.names(wardlabels) <- row.names(goodqual_metadata)
+# wardlabels$potID <- c("1_", "2_", "4_", "6_", "7_", "8_", "9_", "10_", "1_", "2_",  "5_", "7_", "10_", "1_", "2_", "3_", "4_", "5_")
+# wardlabels <- paste(wardlabels$potID, wardlabels$wardlabels, sep = "")
+# 
+# par(mar = c(1, 5, 2, 2) + 0.1)
+# plot(ward_nodES, main = "Ward's Clustering of sites by essential nodulation gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
+# plot(ward_nodNE, main = "Ward's Clustering of sites by nonessential nodulation gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
+# plot(ward_complete, main = "Ward's Clustering of sites by whole-genome fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
+# plot(ward_Nmetabolism, main = "Ward's Clustering of sites by N metabolism gene fitness", ylab = "Squared Euclidean Distance", labels = wardlabels)
+
+
 # 
 # #mulEA (evaluating to replace fgsea with this)
 # 
