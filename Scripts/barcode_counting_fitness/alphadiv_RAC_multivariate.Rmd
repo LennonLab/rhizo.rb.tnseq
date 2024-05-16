@@ -34,6 +34,7 @@ goodcountdat <- cleanrbdat
 metadat = read.csv(file = "~/GitHub/rhizo.rb.tnseq/Data/smeliplant_metadata_plant_seq.csv")
 #remove rows for sample id 25, 34, 36, and 38; reads were < 500,000
 metadat = metadat %>% filter(Barseq_Index != "IT025" & Barseq_Index != "IT034" & Barseq_Index != "IT036" & Barseq_Index != "IT038")
+metadat$Nitrogen_addition <- as.factor(metadat$Nitrogen_addition)
 ```
 
 
@@ -287,32 +288,27 @@ for (i in 1:length(allcovar_permanova)) {
 
 
 #set up row names and such to be merged and unmerged
-RACmetadata <- metadata
-row.names(RACmetadata) <- c("021", "022", "024", "026", "027", "028", "029", "030", "031", "032", "035", "037", "040", "041", "042", "043", "044", "045")
-row.names(goodcountdat) <- c("021", "022", "024", "026", "027", "028", "029", "030", "031",  "032", "035", "037", "040", "041", "042", "043", "044", "045")
+RACmetadata <- metadat
+RACmetadata <- RACmetadata[-c(17:21), ] #remove t0
+RACmetadata <- RACmetadata %>% mutate(group = paste(Subpop, Nitrogen_addition, sep = "_")) #create a single-col group id
+row.names(RACmetadata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040")
+row.names(goodcountdat) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040")
+RACdat <- goodcountdat[, -c(5176:5178)]
 
-#merge metadata tags into a single unique treatment group ID
-RACsubsetter <- as.data.frame(cbind(goodcountdat, RACmetadata))
-RACsubsetter <- RACsubsetter %>% mutate(group = paste(compartment, Ntreatment, sep = "_"))
-RACsubsetter <- RACsubsetter[, -c(5176:5177)] 
+#merged metadata/data df for re-subsetting and creating fitness rankings etc
+RACsubsetter <- as.data.frame(cbind(RACdat, RACmetadata))
 
 #change data to numeric
 RACsubsetter <- RACsubsetter %>%
   mutate(across(1:5175, as.numeric)) 
 
-#version of the RAC function designed to rank fitness scores, which have negative and positive values
-rankfit <- function(x) {
-  x <- as.data.frame(x)
-  x.ranked <- x[order(rownames(x)), , drop = FALSE]
-  rownames(x.ranked) <- rownames(x)[order(rownames(x))]
-  return(x.ranked)
-} 
-
 #create a properly labeled and formatted dataframe to be grouped and meaned by treatment/compartment
 rankfitdata <- t(goodfitdat)
-row.names(rankfitdata) <- c("021", "022", "024", "026", "027", "028", "029", "030", "031", "032", "035", "037", "040", "041", "042", "043", "044", "045")
+rankfitdata <- rankfitdata[-c(1:2), ]
+row.names(rankfitdata) <- c("021", "022", "023", "024", "026", "027", "028", "029", "030", "031", "032", "033", "035", "037", "039", "040", "041", "042", "043", "044", "045")
 rankfitdata <- cbind(RACsubsetter$group, rankfitdata)
 rankfitdata <- as.data.frame(rankfitdata)
+rankfitdata$V1[17:21] <- c("t0", "t0", "t0", "t0", "t0")
 rankfitdata <- rankfitdata %>%
   mutate(across(2:5176, as.numeric)) 
 
@@ -327,7 +323,7 @@ row.names(meanfitnessrank) <- meanfitnessrank[,1]
 meanfitnessrank <- meanfitnessrank[,-1] 
 
 #subsets
-meanfitnessrank_Nmetab <- meanfitnessrank[, intersect(colnames(meanfitnessrank), Nmetabolism$V1)]
+meanfitnessrank_Nmetab <- meanfitnessrank[, intersect(colnames(meanfitnessrank), metabloci)]
 meanfitnessrank_nodNE <- meanfitnessrank[, intersect(colnames(meanfitnessrank), colnames(nodNEfit))]
 meanfitnessrank_nodES <- meanfitnessrank[, intersect(colnames(meanfitnessrank), colnames(nodESfit))]  
 
@@ -337,6 +333,16 @@ bactfertrank <- unlist(meanfitnessrank[2,])
 nodambrank <- unlist(meanfitnessrank[3,])
 nodfertrank <- unlist(meanfitnessrank[4,])
 t0rank <- unlist(meanfitnessrank[5,])
+
+
+#version of the RAC function designed to rank fitness scores, which have negative and positive values
+rankfit <- function(x) {
+  x <- as.data.frame(x)
+  x.ranked <- x[order(rownames(x)), , drop = FALSE]
+  rownames(x.ranked) <- rownames(x)[order(rownames(x))]
+  return(x.ranked)
+} 
+
 
 ranked_bactamb <- rankfit(bactambrank)
 ranked_bactfert <- rankfit(bactfertrank)
@@ -420,6 +426,180 @@ combined_Nmetab <- data.frame(
 )
 
 rownames(combined_Nmetab) <- rownames(ranked_Nmetab_nodamb)
+
+#run K-S tests on data
+
+#function to re-sort fitness rankings from genome order (for spearman) to ascending order (for k-s tests)
+ks_sort <- function(my_ranking) {
+  sorted_list <- my_ranking[order(my_ranking, decreasing = TRUE)]
+  name <- paste0("ks_", deparse(substitute(my_ranking)))
+  names(sorted_list) <- name
+  return(sorted_list)
+} 
+
+#gather all the rankings together for reordering
+all_ranked <- ls(pattern = "^ranked_") 
+
+#for loop which calls ks_sort on all the rankings. Don't know why the redundant paste0(ks_) is needed, but it is!!
+for (name in all_ranked) {
+  ranked_obj <- get(name)
+  if (is.data.frame(ranked_obj)) {
+    ranked_vec <- ranked_obj[, 1]
+  } else {
+    ranked_vec <- ranked_obj
+  }
+  sorted_vec <- ks_sort(ranked_vec)
+  assign(paste0("ks_", name), sorted_vec)
+} 
+
+#whole genome ranked fitness K-S tests
+
+ks_bacteroid_fit <- ks.test(ks_ranked_bactamb, ks_ranked_bactfert, exact = TRUE)
+ks_nodule_fit <- ks.test(ks_ranked_nodamb, ks_ranked_nodfert, exact = TRUE)
+
+ks_amb_compartment_fit <- ks.test(ks_ranked_nodamb, ks_ranked_bactamb, exact = TRUE)
+ks_fert_compartment_fit <- ks.test(ks_ranked_bactfert, ks_ranked_nodfert, exact = TRUE)
+
+#N metabolism subset
+
+ks_bacteroid_Nmetab_fit <- ks.test(ks_ranked_Nmetab_bactamb, ks_ranked_Nmetab_bactfert, exact = TRUE)
+ks_nodule_Nmetab_fit <- ks.test(ks_ranked_Nmetab_nodamb, ks_ranked_Nmetab_nodfert, exact = TRUE)
+
+ks_amb_compartment_Nmetab_fit <- ks.test(ks_ranked_Nmetab_nodamb, ks_ranked_Nmetab_bactamb, exact = TRUE)
+ks_fert_compartment_Nmetab_fit <- ks.test(ks_ranked_Nmetab_bactfert, ks_ranked_Nmetab_nodfert, exact = TRUE)
+
+#nodES and nodNE subsets
+
+ks_bacteroid_nodNE_fit <- ks.test(ks_ranked_nodNE_bactamb, ks_ranked_nodNE_bactfert, exact = TRUE) 
+ks_nodule_nodNE_fit <- ks.test(ks_ranked_nodNE_nodamb, ks_ranked_nodNE_nodfert, exact = TRUE)
+
+ks_amb_nodNE_fit <- ks.test(ks_ranked_nodNE_nodamb, ks_ranked_nodNE_bactamb, exact = TRUE)
+ks_fert_nodNE_fit <- ks.test(ks_ranked_nodNE_nodfert, ks_ranked_nodNE_bactfert, exact = TRUE)
+
+ks_bacteroid_nodES_fit <- ks.test(ks_ranked_nodES_bactamb, ks_ranked_nodES_bactfert, exact = TRUE)
+ks_nodule_nodES_fit <- ks.test(ks_ranked_nodES_nodamb, ks_ranked_nodES_nodfert, exact = TRUE)
+
+ks_amb_nodES_fit <- ks.test(ks_ranked_nodES_nodamb, ks_ranked_nodES_bactamb, exact = TRUE)
+ks_fert_nodES_fit <- ks.test(ks_ranked_nodES_nodfert, ks_ranked_nodES_bactfert, exact = TRUE)
+
+
+#combined RAC-like fitness ranking plots per dataset
+
+#ES
+
+#combine rankings to be plotted together
+finalfitrank_nodES <- as.data.frame(rbind(as.numeric(ks_ranked_nodES_bactamb), as.numeric(ks_ranked_nodES_bactfert), as.numeric(ks_ranked_nodES_nodamb), as.numeric(ks_ranked_nodES_nodfert), as.numeric(ks_ranked_nodES_t0))) 
+colnames(finalfitrank_nodES) <- 1:832
+finalfitrank_nodES$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
+
+#flip df for plotting purposes
+finalfitrank_nodES <- pivot_longer(finalfitrank_nodES, cols = colnames(finalfitrank_nodES)[1:832]) 
+
+combinedfitrank_nodES <- ggplot(finalfitrank_nodES, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
+  geom_line() +
+  labs(title = "nodES fitness ranking") + xlab("Gene count") + ylab("Asinh(fitness value)")
+
+combinedfitrank_nodES
+
+#NE
+
+finalfitrank_nodNE <- as.data.frame(rbind(as.numeric(ks_ranked_nodNE_bactamb), as.numeric(ks_ranked_nodNE_bactfert), as.numeric(ks_ranked_nodNE_nodamb), as.numeric(ks_ranked_nodNE_nodfert), as.numeric(ks_ranked_nodNE_t0)))
+colnames(finalfitrank_nodNE) <- 1:4145
+finalfitrank_nodNE$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
+
+finalfitrank_nodNE <- pivot_longer(finalfitrank_nodNE, cols = colnames(finalfitrank_nodNE)[1:4145])
+
+combinedfitrank_nodNE <- ggplot(finalfitrank_nodNE, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
+  geom_line() +
+  labs(title = "nodNE fitness ranking")  + xlab("Gene count") + ylab("Asinh(fitness value)")
+
+combinedfitrank_nodNE
+
+#complete
+
+finalfitrank_complete <- as.data.frame(rbind(as.numeric(ks_ranked_bactamb), as.numeric(ks_ranked_bactfert), as.numeric(ks_ranked_nodamb), as.numeric(ks_ranked_nodfert), as.numeric(ks_ranked_t0)))
+colnames(finalfitrank_complete) <- 1:5175
+finalfitrank_complete$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
+
+finalfitrank_complete <- pivot_longer(finalfitrank_complete, cols = colnames(finalfitrank_complete)[1:5175])
+
+combinedfitrank_complete <- ggplot(finalfitrank_complete, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
+  geom_line() +
+  labs(title = "Whole-genome fitness ranking")  + xlab("Gene count") + ylab("Asinh(fitness value)")
+
+combinedfitrank_complete
+
+#Nmetabolism
+
+finalfitrank_Nmetab <- as.data.frame(rbind(as.numeric(ks_ranked_Nmetab_bactamb), as.numeric(ks_ranked_Nmetab_bactfert), as.numeric(ks_ranked_Nmetab_nodamb), as.numeric(ks_ranked_Nmetab_nodfert), as.numeric(ks_ranked_Nmetab_t0)))
+colnames(finalfitrank_Nmetab) <- 1:29
+finalfitrank_Nmetab$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
+
+finalfitrank_Nmetab <- pivot_longer(finalfitrank_Nmetab, cols = colnames(finalfitrank_Nmetab)[1:29])
+
+combinedfitrank_Nmetab <- ggplot(finalfitrank_Nmetab, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
+  geom_line() +
+  labs(title = "N metabolism fitness ranking")  + xlab("Gene count") + ylab("Asinh(fitness value)")
+
+combinedfitrank_Nmetab
+
+#False discovery rate adjustments and building final table
+
+ks_objects <- ls(pattern = "^ks_.*_fit$", envir = .GlobalEnv)
+ks_test_objects <- character(0)
+
+#some objects named "ks_" are not k-s tests, but all true k-s tests are "list" type objects, so this loop goes through the ks_objects and picks only the ones that are lists, ie actual k-s tests
+for (obj in ks_objects) {
+  if (typeof(get(obj)) == "list") {
+    ks_test_objects <- c(ks_test_objects, obj)
+  }
+} 
+
+#make a landing zone for the pvals and IDs that's as long as the input df
+p_values <- numeric(length(ks_test_objects)) 
+
+#for each item in the sequence within ks_test_objects, add a value to p_values which is from that index's entry in ks_test_objects and is called [entry]$p.value
+for (i in seq_along(ks_test_objects)) {
+  p_values[i] <- get(ks_test_objects[i])$p.value
+} 
+
+#name them according to the test they came from
+names(p_values) <- gsub("^ks_", "", ks_test_objects) 
+
+#run the FDR and store results
+adjusted_pvals_ks <- p.adjust(p_values, method = "fdr") 
+
+ks_results_table <- data.frame(Dval = numeric(length(ks_objects)),
+                               qval = numeric(length(ks_objects))) 
+
+#get data from results objects and put them into malleable form
+for (i in seq_along(ks_objects)) {
+  ks_test_name <- ks_objects[i]
+  ks_test_result <- get(ks_test_name)  #retrieve the K-S test result object using its name
+  ks_results_table[i, "Dval"] <- ks_test_result$statistic
+  ks_results_table[i, "qval"] <- adjusted_pvals_ks[[i]]
+}
+
+#set row names to corresponding K-S test
+rownames(ks_results_table) <- ks_objects 
+
+#build individual tables of k_s results for pairing with fitrank plots
+
+#row names
+row_names_nodES <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
+row_names_nodNE <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
+row_names_complete <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
+row_names_Nmetab <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N") 
+
+#pull ks test statistics and set row names to name the comparison more clearly
+fitrank_nodES <- ks_results_table[c("ks_amb_nodES_fit", "ks_bacteroid_nodES_fit", "ks_fert_nodES_fit", "ks_nodule_nodES_fit"), ]
+rownames(fitrank_nodES) <- row_names_nodES
+fitrank_nodNE <- ks_results_table[c("ks_amb_nodNE_fit", "ks_bacteroid_nodNE_fit", "ks_fert_nodNE_fit", "ks_nodule_nodNE_fit"), ]
+rownames(fitrank_nodNE) <- row_names_nodNE
+fitrank_complete <- ks_results_table[c("ks_amb_compartment_fit", "ks_bacteroid_fit", "ks_fert_compartment_fit", "ks_nodule_fit"), ]
+rownames(fitrank_complete) <- row_names_complete
+fitrank_Nmetab <- ks_results_table[c("ks_amb_compartment_Nmetab_fit", "ks_bacteroid_Nmetab_fit", "ks_fert_compartment_Nmetab_fit", "ks_nodule_Nmetab_fit"), ]
+rownames(fitrank_Nmetab) <- row_names_Nmetab 
 
 
 #Spearman correlation tests for rankfit paired datasets
@@ -554,185 +734,14 @@ for (test_name in all_spearman) {
   scatterplot_list[[paste(test_name, "scatterplot", sep = "_")]] <- scatterplot #add to plot list
 }
 
+scatterplot_list
 
-#run K-S tests on data
-
-#function to re-sort fitness rankings from genome order (for spearman) to ascending order (for k-s tests)
-ks_sort <- function(my_ranking) {
-  sorted_list <- my_ranking[order(my_ranking, decreasing = TRUE)]
-  name <- paste0("ks_", deparse(substitute(my_ranking)))
-  names(sorted_list) <- name
-  return(sorted_list)
-} 
-
-#gather all the rankings together for reordering
-all_ranked <- ls(pattern = "^ranked_") 
-
-#for loop which calls ks_sort on all the rankings. Don't know why the redundant paste0(ks_) is needed, but it is!!
-for (name in all_ranked) {
-  ranked_obj <- get(name)
-  if (is.data.frame(ranked_obj)) {
-    ranked_vec <- ranked_obj[, 1]
-  } else {
-    ranked_vec <- ranked_obj
-  }
-  sorted_vec <- ks_sort(ranked_vec)
-  assign(paste0("ks_", name), sorted_vec)
-} 
-
-#whole genome ranked fitness K-S tests
-
-ks_bacteroid_fit <- ks.test(ks_ranked_bactamb, ks_ranked_bactfert, exact = TRUE)
-ks_nodule_fit <- ks.test(ks_ranked_nodamb, ks_ranked_nodfert, exact = TRUE)
-
-ks_amb_compartment_fit <- ks.test(ks_ranked_nodamb, ks_ranked_bactamb, exact = TRUE)
-ks_fert_compartment_fit <- ks.test(ks_ranked_bactfert, ks_ranked_nodfert, exact = TRUE)
-
-#N metabolism subset
-
-ks_bacteroid_Nmetab_fit <- ks.test(ks_ranked_Nmetab_bactamb, ks_ranked_Nmetab_bactfert, exact = TRUE)
-ks_nodule_Nmetab_fit <- ks.test(ks_ranked_Nmetab_nodamb, ks_ranked_Nmetab_nodfert, exact = TRUE)
-
-ks_amb_compartment_Nmetab_fit <- ks.test(ks_ranked_Nmetab_nodamb, ks_ranked_Nmetab_bactamb, exact = TRUE)
-ks_fert_compartment_Nmetab_fit <- ks.test(ks_ranked_Nmetab_bactfert, ks_ranked_Nmetab_nodfert, exact = TRUE)
-
-#nodES and nodNE subsets
-
-ks_bacteroid_nodNE_fit <- ks.test(ks_ranked_nodNE_bactamb, ks_ranked_nodNE_bactfert, exact = TRUE) 
-ks_nodule_nodNE_fit <- ks.test(ks_ranked_nodNE_nodamb, ks_ranked_nodNE_nodfert, exact = TRUE)
-
-ks_amb_nodNE_fit <- ks.test(ks_ranked_nodNE_nodamb, ks_ranked_nodNE_bactamb, exact = TRUE)
-ks_fert_nodNE_fit <- ks.test(ks_ranked_nodNE_nodfert, ks_ranked_nodNE_bactfert, exact = TRUE)
-
-ks_bacteroid_nodES_fit <- ks.test(ks_ranked_nodES_bactamb, ks_ranked_nodES_bactfert, exact = TRUE)
-ks_nodule_nodES_fit <- ks.test(ks_ranked_nodES_nodamb, ks_ranked_nodES_nodfert, exact = TRUE)
-
-ks_amb_nodES_fit <- ks.test(ks_ranked_nodES_nodamb, ks_ranked_nodES_bactamb, exact = TRUE)
-ks_fert_nodES_fit <- ks.test(ks_ranked_nodES_nodfert, ks_ranked_nodES_bactfert, exact = TRUE)
-
-
-#combined RAC-like fitness ranking plots per dataset
-
-
-#ES
-
-#combine rankings to be plotted together
-finalfitrank_nodES <- as.data.frame(rbind(as.numeric(ks_ranked_nodES_bactamb), as.numeric(ks_ranked_nodES_bactfert), as.numeric(ks_ranked_nodES_nodamb), as.numeric(ks_ranked_nodES_nodfert), as.numeric(ks_ranked_nodES_t0))) 
-colnames(finalfitrank_nodES) <- 1:832
-finalfitrank_nodES$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
-
-#flip df for plotting purposes
-finalfitrank_nodES <- pivot_longer(finalfitrank_nodES, cols = colnames(finalfitrank_nodES)[1:832]) 
-
-combinedfitrank_nodES <- ggplot(finalfitrank_nodES, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
-  geom_line() +
-  labs(title = "nodES fitness ranking") + xlab("Gene count") + ylab("Asinh(fitness value)")
-
-combinedfitrank_nodES
-
-#NE
-
-finalfitrank_nodNE <- as.data.frame(rbind(as.numeric(ks_ranked_nodNE_bactamb), as.numeric(ks_ranked_nodNE_bactfert), as.numeric(ks_ranked_nodNE_nodamb), as.numeric(ks_ranked_nodNE_nodfert), as.numeric(ks_ranked_nodNE_t0)))
-colnames(finalfitrank_nodNE) <- 1:4145
-finalfitrank_nodNE$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
-
-finalfitrank_nodNE <- pivot_longer(finalfitrank_nodNE, cols = colnames(finalfitrank_nodNE)[1:4145])
-
-combinedfitrank_nodNE <- ggplot(finalfitrank_nodNE, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
-  geom_line() +
-  labs(title = "nodNE fitness ranking")  + xlab("Gene count") + ylab("Asinh(fitness value)")
-
-combinedfitrank_nodNE
-
-#complete
-
-finalfitrank_complete <- as.data.frame(rbind(as.numeric(ks_ranked_bactamb), as.numeric(ks_ranked_bactfert), as.numeric(ks_ranked_nodamb), as.numeric(ks_ranked_nodfert), as.numeric(ks_ranked_t0)))
-colnames(finalfitrank_complete) <- 1:5175
-finalfitrank_complete$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
-
-finalfitrank_complete <- pivot_longer(finalfitrank_complete, cols = colnames(finalfitrank_complete)[1:5175])
-
-combinedfitrank_complete <- ggplot(finalfitrank_complete, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
-  geom_line() +
-  labs(title = "Whole-genome fitness ranking")  + xlab("Gene count") + ylab("Asinh(fitness value)")
-
-combinedfitrank_complete
-
-#Nmetabolism
-
-finalfitrank_Nmetab <- as.data.frame(rbind(as.numeric(ks_ranked_Nmetab_bactamb), as.numeric(ks_ranked_Nmetab_bactfert), as.numeric(ks_ranked_Nmetab_nodamb), as.numeric(ks_ranked_Nmetab_nodfert), as.numeric(ks_ranked_Nmetab_t0)))
-colnames(finalfitrank_Nmetab) <- 1:29
-finalfitrank_Nmetab$treatment <- c("bact_amb", "bact_fert", "nod_amb", "nod_fert", "t0")
-
-finalfitrank_Nmetab <- pivot_longer(finalfitrank_Nmetab, cols = colnames(finalfitrank_Nmetab)[1:29])
-
-combinedfitrank_Nmetab <- ggplot(finalfitrank_Nmetab, aes(x = as.numeric(as.character(name)), y = asinh(value), group = treatment, color = treatment, fill = treatment)) +
-  geom_line() +
-  labs(title = "N metabolism fitness ranking")  + xlab("Gene count") + ylab("Asinh(fitness value)")
-
-combinedfitrank_Nmetab
-
-#False discovery rate adjustments and building final table
-
-ks_objects <- ls(pattern = "^ks_.*_fit$", envir = .GlobalEnv)
-ks_test_objects <- character(0)
-
-#some objects named "ks_" are not k-s tests, but all true k-s tests are "list" type objects, so this loop goes through the ks_objects and picks only the ones that are lists, ie actual k-s tests
-for (obj in ks_objects) {
-  if (typeof(get(obj)) == "list") {
-    ks_test_objects <- c(ks_test_objects, obj)
-  }
-} 
-
-#make a landing zone for the pvals and IDs that's as long as the input df
-p_values <- numeric(length(ks_test_objects)) 
-
-#for each item in the sequence within ks_test_objects, add a value to p_values which is from that index's entry in ks_test_objects and is called [entry]$p.value
-for (i in seq_along(ks_test_objects)) {
-  p_values[i] <- get(ks_test_objects[i])$p.value
-} 
-
-#name them according to the test they came from
-names(p_values) <- gsub("^ks_", "", ks_test_objects) 
-
-#run the FDR and store results
-adjusted_pvals_ks <- p.adjust(p_values, method = "fdr") 
-
-ks_results_table <- data.frame(Dval = numeric(length(ks_objects)),
-                               qval = numeric(length(ks_objects))) 
-
-#get data from results objects and put them into malleable form
-for (i in seq_along(ks_objects)) {
-  ks_test_name <- ks_objects[i]
-  ks_test_result <- get(ks_test_name)  #retrieve the K-S test result object using its name
-  ks_results_table[i, "Dval"] <- ks_test_result$statistic
-  ks_results_table[i, "qval"] <- adjusted_pvals_ks[[i]]
-}
-
-#set row names to corresponding K-S test
-rownames(ks_results_table) <- ks_objects 
-
-#build individual tables of k_s results for pairing with fitrank plots
-
-#row names
-row_names_nodES <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
-row_names_nodNE <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
-row_names_complete <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N")
-row_names_Nmetab <- c("bact_amb/nod_amb", "bact_amb/bact_N", "bact_N/nod_N", "nod_amb/nod_N") 
-
-#pull ks test statistics and set row names to name the comparison more clearly
-fitrank_nodES <- ks_results_table[c("ks_amb_nodES_fit", "ks_bacteroid_nodES_fit", "ks_fert_nodES_fit", "ks_nodule_nodES_fit"), ]
-rownames(fitrank_nodES) <- row_names_nodES
-fitrank_nodNE <- ks_results_table[c("ks_amb_nodNE_fit", "ks_bacteroid_nodNE_fit", "ks_fert_nodNE_fit", "ks_nodule_nodNE_fit"), ]
-rownames(fitrank_nodNE) <- row_names_nodNE
-fitrank_complete <- ks_results_table[c("ks_amb_compartment_fit", "ks_bacteroid_fit", "ks_fert_compartment_fit", "ks_nodule_fit"), ]
-rownames(fitrank_complete) <- row_names_complete
-fitrank_Nmetab <- ks_results_table[c("ks_amb_compartment_Nmetab_fit", "ks_bacteroid_Nmetab_fit", "ks_fert_compartment_Nmetab_fit", "ks_nodule_Nmetab_fit"), ]
-rownames(fitrank_Nmetab) <- row_names_Nmetab 
 ```
 
 
 ```{r Chunk 7: Covariance PCA + plots}
+
+
 #correlation matrices for KMO and bartlett tests
 cor_nodES <- cor(covar_nodES)
 cor_nodNE <- cor(covar_nodNE)
@@ -777,7 +786,7 @@ covar_scores_Nmetab <- as.data.frame(pca_covar_Nmetab$x[, 1:2])
 
 #ES
 
-ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadata$Ntreatment, shape = finalmetadata$compartment)) +
+ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadat$Subpop, shape = finalmetadat$Nitrogen_addition)) +
   geom_point(size = 18) +
   xlim(c(-15,20)) +
   ylim(c(-15,15)) +
@@ -796,7 +805,7 @@ ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadata$Ntreatmen
     ) +
   theme(legend.position = "none") #pared down and resized for poster
 
-ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadata$Ntreatment, shape = finalmetadata$compartment)) +
+ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadat$Subpop, shape = finalmetadat$Nitrogen_addition)) +
   geom_point(size = 18) +
   xlim(c(-15,20)) +
   ylim(c(-15,15)) +
@@ -814,7 +823,7 @@ ggplot(covar_scores_nodES, aes(x = PC1, y = PC2, color = finalmetadata$Ntreatmen
 
 #NE
 
-ggplot(covar_scores_nodNE,aes(x=PC1,y=PC2, color = finalmetadata$Ntreatment, shape = finalmetadata$compartment)) +
+ggplot(covar_scores_nodNE,aes(x=PC1,y=PC2, color = finalmetadat$Subpop, shape = finalmetadat$Nitrogen_addition)) +
   geom_point(size=8)+
   xlab("PC 1 (18%)") +
   ylab("PC 2 (16%)") +
@@ -829,7 +838,7 @@ ggplot(covar_scores_nodNE,aes(x=PC1,y=PC2, color = finalmetadata$Ntreatment, sha
 
 #complete
 
-ggplot(covar_scores_complete,aes(x=PC1,y=PC2, color = finalmetadata$Ntreatment, shape = finalmetadata$compartment)) +
+ggplot(covar_scores_complete,aes(x=PC1,y=PC2, color = finalmetadat$Subpop, shape = finalmetadat$Nitrogen_addition)) +
   geom_point(size=8)+
   xlab("PC 1 (18%)") +
   ylab("PC 2 (14%)") +
@@ -844,7 +853,7 @@ ggplot(covar_scores_complete,aes(x=PC1,y=PC2, color = finalmetadata$Ntreatment, 
 
 #Nmetabolism
 
-ggplot(covar_scores_Nmetab,aes(x=PC1,y=PC2, color = finalmetadata$Ntreatment, shape = finalmetadata$compartment)) +
+ggplot(covar_scores_Nmetab,aes(x=PC1,y=PC2, color = finalmetadat$Subpop, shape = finalmetadat$Nitrogen_addition)) +
   geom_point(size=8)+
   xlab("PC 1 (36%)") +
   ylab("PC 2 (25%)") +
@@ -866,6 +875,8 @@ plot(compare_sym)
 ```
 
 ``` {r Chunk 8: fgsea and geseca for COGs}
+
+
 #I added these renamed files to my R working directory
 pathways_ES <- gmtPathways("COGsets_ES.gmt") 
 pathways_NE <- gmtPathways("COGsets_NE.gmt")
@@ -884,8 +895,8 @@ tlike_data <- tlike_data[, -c(18:22)]
 tlike_col_ranges <- list(
   nodN = c(2:5),
   nodamb = c(6:10),
-  bactN = c(11:13),
-  bactamb = c(14:15)
+  bactN = c(11:14),
+  bactamb = c(15:17)
 ) 
 
 #create df to be populated by meaned t-like data
@@ -911,25 +922,26 @@ print(tlike_data_meaned)
 row.names(tlike_data_meaned) <- tlike_data_meaned[, 1]
 tlike_data_meaned <- tlike_data_meaned[, -c(1)] 
 
-# tlike_meaned_nodN <- unlist(tlike_data_meaned[,1])
-# tlike_meaned_nodamb <- unlist(tlike_data_meaned[,2])
-# tlike_meaned_bactN <- unlist(tlike_data_meaned[,3])
-# tlike_meaned_bactamb <- unlist(tlike_data_meaned[,4]) #due to difficulties with variable typing, the object must be unlisted into four separate objects, renamed, ranked, re-sorted, written to a .rnk file, read back into the environment as such, then converted and renamed again, before being fed into fgsea. Many of these steps are likely redundant; will be cleaned up later
-# 
-# names(tlike_meaned_nodN) <- rownames(tlike_data_meaned)
-# names(tlike_meaned_nodamb) <- rownames(tlike_data_meaned)
-# names(tlike_meaned_bactN) <- rownames(tlike_data_meaned)
-# names(tlike_meaned_bactamb) <- rownames(tlike_data_meaned)
-# 
-# tlike_nodN_ranked <- rankfit(tlike_meaned_nodN)
-# tlike_nodamb_ranked <- rankfit(tlike_meaned_nodamb)
-# tlike_bactN_ranked <- rankfit(tlike_meaned_bactN)
-# tlike_bactamb_ranked <- rankfit(tlike_meaned_bactamb) #rank from greatest to least
-# 
-# tlike_nodN_ranked <- tlike_nodN_ranked[order(-tlike_nodN_ranked$x),,drop=FALSE]
-# tlike_nodamb_ranked <- tlike_nodamb_ranked[order(-tlike_nodamb_ranked$x),,drop=FALSE]
-# tlike_bactN_ranked <- tlike_bactN_ranked[order(-tlike_bactN_ranked$x),,drop=FALSE]
-# tlike_bactamb_ranked <- tlike_bactamb_ranked[order(-tlike_bactamb_ranked$x),,drop=FALSE] #sorts ranks by # rather than gene name
+tlike_meaned_nodN <- unlist(tlike_data_meaned[,1])
+tlike_meaned_nodamb <- unlist(tlike_data_meaned[,2])
+tlike_meaned_bactN <- unlist(tlike_data_meaned[,3])
+tlike_meaned_bactamb <- unlist(tlike_data_meaned[,4]) #due to difficulties with variable typing, the object must be unlisted into four separate objects, renamed, ranked, re-sorted, written to a .rnk file, read back into the environment as such, then converted and renamed again, before being fed into fgsea. Many of these steps are likely redundant
+
+
+names(tlike_meaned_nodN) <- rownames(tlike_data_meaned)
+names(tlike_meaned_nodamb) <- rownames(tlike_data_meaned)
+names(tlike_meaned_bactN) <- rownames(tlike_data_meaned)
+names(tlike_meaned_bactamb) <- rownames(tlike_data_meaned)
+
+tlike_nodN_ranked <- rankfit(tlike_meaned_nodN)
+tlike_nodamb_ranked <- rankfit(tlike_meaned_nodamb)
+tlike_bactN_ranked <- rankfit(tlike_meaned_bactN)
+tlike_bactamb_ranked <- rankfit(tlike_meaned_bactamb) #rank from greatest to least
+
+tlike_nodN_ranked <- tlike_nodN_ranked[order(-tlike_nodN_ranked$x),,drop=FALSE]
+tlike_nodamb_ranked <- tlike_nodamb_ranked[order(-tlike_nodamb_ranked$x),,drop=FALSE]
+tlike_bactN_ranked <- tlike_bactN_ranked[order(-tlike_bactN_ranked$x),,drop=FALSE]
+tlike_bactamb_ranked <- tlike_bactamb_ranked[order(-tlike_bactamb_ranked$x),,drop=FALSE] #sorts ranks by # rather than gene name
 
 # write.table(tlike_nodN_ranked, file = "C:/Users/User/Desktop/nodN_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
 # write.table(tlike_nodamb_ranked, file = "C:/Users/User/Desktop/nodamb_ranked.rnk", sep = "\t", quote = FALSE, row.names = TRUE)
@@ -1106,7 +1118,7 @@ KEGGfit_env <- lapply(KEGGfit_env, function(df) {
 KEGGfit_env <- lapply(KEGGfit_env, function(df) {
   if (!is.null(df)) {
     df <- df %>%
-      select(-c(5, 19:23))
+      select(-c(5, 22:26))
     return(df)
   }
   return(NULL)
@@ -1126,9 +1138,9 @@ df_names <- ls(KEGGfit_env)
 for (df_name in df_names) {
   df <- KEGGfit_env[[df_name]]
   
-  negatives <- rowSums(df[, 5:17] == -1)
-  zeros <- rowSums(df[, 5:17] == 0)
-  positives <- rowSums(df[, 5:17] == 1) #total up the frequency of 1s, 0s, and -1s in the fitness values of each df
+  negatives <- rowSums(df[, 5:20] == -1)
+  zeros <- rowSums(df[, 5:20] == 0)
+  positives <- rowSums(df[, 5:20] == 1) #total up the frequency of 1s, 0s, and -1s in the fitness values of each df
   
   condensed_df <- df %>% 
     select(essentiality) %>%
@@ -1153,8 +1165,8 @@ for (df_name in ls(KEGGfit_env)) {
   neutral_N <- sum(df$neutral[df$essentiality == "N"]) #total up values for positive tables
   
   df_positive <- data.frame(
-    positive = c(positive_essential, positive_N) / 13,
-    neutral = c(neutral_essential, neutral_N) / 13
+    positive = c(positive_essential, positive_N) / 16,
+    neutral = c(neutral_essential, neutral_N) / 16
   ) 
   df_positive <- round(df_positive)
   rownames(df_positive) <- c("essential", "N") #divide by n to get mean values and add to df with proper row names for essentiality category
@@ -1168,8 +1180,8 @@ for (df_name in ls(KEGGfit_env)) {
   neutral_N <- sum(df$neutral[df$essentiality == "N"]) #total up values for negative tables
   
   df_negative <- data.frame(
-    negative = c(negative_essential, negative_N) / 13,
-    neutral = c(neutral_essential, neutral_N) / 13
+    negative = c(negative_essential, negative_N) / 16,
+    neutral = c(neutral_essential, neutral_N) / 16
   )
   df_negative <- round(df_negative)
   rownames(df_negative) <- c("essential", "N") #make negative tables of mean values
@@ -1641,17 +1653,17 @@ generate_comparison_name <- function(name) {
   second_number <- substr(name, 5, 7) #get the two three-digit numbers
   
 #comparison name generated as follows based on numbers retrieved  
-  if (first_number %in% c("021", "022", "024", "031", "032", "035")) {
+  if (first_number %in% c("021", "022", "023", "024", "031", "032", "033", "035")) {
     first_name <- "+N"
-  } else if (first_number %in% c("026", "027", "028", "029", "030", "037", "040")) {
+  } else if (first_number %in% c("026", "027", "028", "029", "030", "037", "039", "040")) {
     first_name <- "-N"
   } else {
     first_name <- first_number
   }
   
-  if (second_number %in% c("021", "022", "024", "031", "032", "035")) {
+  if (second_number %in% c("021", "022", "023", "024", "031", "032", "033", "035")) {
     second_name <- "+N"
-  } else if (second_number %in% c("026", "027", "028", "029", "030", "037", "040")) {
+  } else if (second_number %in% c("026", "027", "028", "029", "030", "037", "039", "040")) {
     second_name <- "-N"
   } else {
     second_name <- second_number
@@ -1674,17 +1686,17 @@ generate_subpopulation_name <- function(name) {
   first_number <- substr(name, 1, 3)
   second_number <- substr(name, 5, 7)
   
-  if (first_number %in% c("021", "022", "024", "026", "027", "028", "029", "030")) {
+  if (first_number %in% c("021", "022", "023", "024", "026", "027", "028", "029", "030")) {
     first_name <- "Nodule"
-  } else if (first_number %in% c("031", "032", "035", "037", "040")) {
+  } else if (first_number %in% c("031", "032", "033", "035", "037", "039", "040")) {
     first_name <- "Bacteroid"
   } else {
     first_name <- first_number
   }
   
-  if (second_number %in% c("021", "022", "024", "026", "027", "028", "029", "030")) {
+  if (second_number %in% c("021", "022", "023", "024", "026", "027", "028", "029", "030")) {
     second_name <- "Nodule"
-  } else if (second_number %in% c("031", "032", "035", "037", "040")) {
+  } else if (second_number %in% c("031", "032", "033", "035", "037", "039", "040")) {
     second_name <- "Bacteroid"
   } else {
     second_name <- second_number
@@ -1873,15 +1885,15 @@ nodN_NE_leadingEdge <- fitmetadata[fitmetadata$locus_tag %in% all_NE_nodN, ]
 ANOVAcomplete <- COGcomplete
 
 #remove t0 and extraneous info
-ANOVAcomplete <- ANOVAcomplete[, -c(32:36)] 
-ANOVAfitness <- ANOVAcomplete[, c(1, 19:31)]
-anovastrata <- potlabels[-c(14:18)]
+ANOVAcomplete <- ANOVAcomplete[, -c(37:41)] 
+ANOVAfitness <- ANOVAcomplete[, c(1, 21:36)]
+anovastrata <- potlabels[-c(17:21)]
 rownames(ANOVAfitness) <- ANOVAfitness$locus_tag
 ANOVAfitness <- t(ANOVAfitness[, -c(1)])
 
 #define treatment groups
-ANOVAfitness <- data.frame(Ntreatment = c(rep("fertilized",3), rep("ambient",5),rep("fertilized", 3), rep("ambient", 2)), 
-                            compartment = c(rep("nodule",8), rep("bacteroid",5)),
+ANOVAfitness <- data.frame(Ntreatment = c(rep("fertilized",4), rep("ambient",5),rep("fertilized", 4), rep("ambient", 3)), 
+                            compartment = c(rep("nodule",9), rep("bacteroid",7)),
                             strata = anovastrata, ANOVAfitness)
 
 #run gene-level anovas on each gene in the genome testing for effects of N treatment and subpopulation
